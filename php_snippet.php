@@ -1,3 +1,4 @@
+<?php
 /**
 *割と万能のsql実行php
 *   @param object $c_dbi DB接続インスタンス
