@@ -1,0 +1,2 @@
+serial,item_serial,seller_id,buyer_id,amount,payment_type,del_flg
+0,1,test_seller,test_buyer,3,creditcard,0
