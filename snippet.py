@@ -2,6 +2,7 @@ import pandas as pd
 import mysql.connector
 from sqlalchemy import create_engine
 import matplotlib.pyplot as plt
+import numpy as np
 
 df = pd.read_csv("/home/ubuntu/pandas-snippet/train.csv")
 
@@ -90,7 +91,7 @@ print(df["error"])
 print("\n-----------------------------------\n")
 df = db_pd(
     "SELECT  order_serial,juchubi,tanka,shouhin,kingaku,urite_shamei,ken,gyoushu,chumon,suryou FROM order_dat_m WHERE ken=%s AND order_time>DATE_ADD(CURRENT_DATE, INTERVAL - 30 DAY)",
-    ("千葉県",),
+    ("東京都",),
 )
 print("read from db sqlalchemy\n")
 print(df["data"])
@@ -101,9 +102,12 @@ print(df["error"])
 print("\n-----------------------------------\n")
 df = df["data"]
 print(df.mean(numeric_only=True))
-df1 = df.loc[df["chumon"] == "通"]
-df2 = df.loc[df["chumon"] == "ONEクリック"]
+df_filtered = df[
+    np.abs((df["kingaku"] - df["kingaku"].mean()) / (df["kingaku"].std())) < 2
+]
+df1 = df_filtered.loc[df["chumon"] == "通"]
+df2 = df_filtered.loc[df["chumon"] == "ONEクリック"]
 plt.figure()
-plt.hist(df["kingaku"].tolist(), bins=20, density=True, color="skyblue", alpha=0.5)
-plt.hist(df2["kingaku"].tolist(), bins=20, density=True, color="red", alpha=0.5)
+plt.hist(df1["kingaku"].tolist(), bins=20, color="skyblue", alpha=0.5)
+# plt.hist(df2["kingaku"].tolist(), bins=20, color="red", alpha=0.5)
 plt.savefig("histogram.png", dpi=300, bbox_inches="tight")
