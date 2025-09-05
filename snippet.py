@@ -104,10 +104,10 @@ df = df["data"]
 print(df.mean(numeric_only=True))
 df_filtered = df[
     np.abs((df["kingaku"] - df["kingaku"].mean()) / (df["kingaku"].std())) < 2
-]
-df1 = df_filtered.loc[df["chumon"] == "通"]
+]  # 金額について外れ値除外
+df1 = df_filtered.loc[df["chumon"] == "通"]  # 特定のデータ抜粋
 df2 = df_filtered.loc[df["chumon"] == "ONEクリック"]
 plt.figure()
 plt.hist(df1["kingaku"].tolist(), bins=20, color="skyblue", alpha=0.5)
-# plt.hist(df2["kingaku"].tolist(), bins=20, color="red", alpha=0.5)
+plt.hist(df2["kingaku"].tolist(), bins=20, color="red", alpha=0.5)
 plt.savefig("histogram.png", dpi=300, bbox_inches="tight")
