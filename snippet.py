@@ -3,6 +3,8 @@ import mysql.connector
 from sqlalchemy import create_engine
 import matplotlib.pyplot as plt
 import numpy as np
+import math
+import re
 
 df = pd.read_csv("/home/ubuntu/pandas-snippet/train.csv")
 
@@ -111,3 +113,28 @@ plt.figure()
 plt.hist(df1["kingaku"].tolist(), bins=20, color="skyblue", alpha=0.5)
 plt.hist(df2["kingaku"].tolist(), bins=20, color="red", alpha=0.5)
 plt.savefig("histogram.png", dpi=300, bbox_inches="tight")
+# 配列について
+test = [21]
+test.append(22)
+print(test)
+test.extend([23, 24, 25])
+print(test)
+test.insert(2, 22.5)
+print(test)
+ans = []
+for i, num in enumerate(test):
+    if num % 1 > 0:
+        print("{}th in test has digits".format(i))
+    ans += [math.floor(num)]
+print(ans)
+print(ans.count(22))
+ans.pop()
+print(ans)
+ans.pop(2)
+print(ans)
+tdict = {"insert": 0, "home": 1, "pgup": 2, "delete": 3, "end": 4, "pgdn": 5}
+print(tdict.keys())
+print(tdict.values())
+for key in tdict.keys():
+    if re.match("pg", key):
+        print("{} is related with page".format(key))
