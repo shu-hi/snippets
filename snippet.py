@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import re
-
-df = pd.read_csv("/home/ubuntu/pandas-snippet/train.csv")
+from sklearn.linear_model import LinearRegression
 
 
 def tsv2_connection():
@@ -86,21 +85,15 @@ print("\n-----------------------------------\n")
 df = db_pd("SELECT * FROM order_dat_m WHERE order_serial=%s", [4175800])
 print("read from db mysql\n")
 print(df["data"])
-print("\n")
-print(df["status"])
-print("\n")
-print(df["error"])
+print("\n" + df["status"] + "\n" + df["error"])
 print("\n-----------------------------------\n")
 df = db_pd(
-    "SELECT  order_serial,juchubi,tanka,shouhin,kingaku,urite_shamei,ken,gyoushu,chumon,suryou FROM order_dat_m WHERE ken=%s AND order_time>DATE_ADD(CURRENT_DATE, INTERVAL - 30 DAY)",
+    "SELECT  order_serial,juchubi,tanka,shouhin,kingaku,urite_shamei,ken,gyoushu,chumon,suryou FROM order_dat_m WHERE ken=%s AND order_time>DATE_ADD(CURRENT_DATE, INTERVAL - 3 DAY) order by juchubi",
     ("東京都",),
 )
 print("read from db sqlalchemy\n")
 print(df["data"])
-print("\n")
-print(df["status"])
-print("\n")
-print(df["error"])
+print("\n" + df["status"] + "\n" + df["error"])
 print("\n-----------------------------------\n")
 df = df["data"]
 print(df.mean(numeric_only=True))
@@ -113,6 +106,62 @@ plt.figure()
 plt.hist(df1["kingaku"].tolist(), bins=20, color="skyblue", alpha=0.5)
 plt.hist(df2["kingaku"].tolist(), bins=20, color="red", alpha=0.5)
 plt.savefig("histogram.png", dpi=300, bbox_inches="tight")
+df["index"] = np.arange(len(df.index))
+X = df.loc[:, ["index"]]
+y = df.loc[:, ["kingaku"]]
+model = LinearRegression()
+model.fit(X, y)
+df["predicted_sales"] = model.predict(X)
+plt.figure(figsize=(20, 10))
+plt.plot(df.index, y, label="Actual Sales", marker="o")
+plt.plot(
+    df.index,
+    df["predicted_sales"],
+    label="Predicted Sales (Regression Line)",
+    linestyle="--",
+)
+plt.xlabel("Time")
+plt.ylabel("Sales")
+plt.title("Linear Regression: Sales over Time")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("linreg.png")
+print(f"傾き（coefficient）: {model.coef_[0]}")
+print(f"切片（intercept）: {model.intercept_}")
+
+df3 = db_pd(
+    "SELECT  order_serial,juchubi,tanka,shouhin,SUM(kingaku)AS kingaku,urite_shamei,ken,gyoushu,chumon,suryou FROM order_dat_m WHERE ken=%s AND order_time>DATE_ADD(CURRENT_DATE, INTERVAL - 120 DAY) group by juchubi order by juchubi",
+    ("東京都",),
+)
+df3 = df3["data"]
+
+df3["lag_1"] = df3["kingaku"].shift(1)  # try to predict value of next day
+X = df3.loc[:, ["lag_1"]]
+X.dropna(inplace=True)
+y = df3.loc[:, "kingaku"]  # target
+y, X = y.align(X, join="inner")  # inner:drop corresponding values in target
+model = LinearRegression()
+model.fit(X, y)
+y_pred = pd.Series(model.predict(X), index=X.index)
+
+plt.figure(figsize=(12, 6))
+
+# 実際の sales（ターゲット）
+plt.plot(y.index, y, label="Actual Sales", marker="o")
+
+# 予測した sales（モデル予測）
+plt.plot(y_pred.index, y_pred, label="Predicted Sales (Lag Model)", linestyle="--")
+
+plt.xlabel("Date" if isinstance(y.index[0], pd.Timestamp) else "Time")
+plt.ylabel("Sales")
+plt.title("Sales Prediction using Lag Feature (lag_1)")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("lagreg.png")  # まあ当然当たらん
+
+
 # 配列について
 test = [21]
 test.append(22)
