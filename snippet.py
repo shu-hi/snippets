@@ -6,6 +6,7 @@ import numpy as np
 import math
 import re
 from sklearn.linear_model import LinearRegression
+import statsmodels.formula.api as smf
 
 
 def tsv2_connection():
@@ -106,6 +107,8 @@ plt.figure()
 plt.hist(df1["kingaku"].tolist(), bins=20, color="skyblue", alpha=0.5)
 plt.hist(df2["kingaku"].tolist(), bins=20, color="red", alpha=0.5)
 plt.savefig("histogram.png", dpi=300, bbox_inches="tight")
+
+
 df["index"] = np.arange(len(df.index))
 X = df.loc[:, ["index"]]
 y = df.loc[:, ["kingaku"]]
@@ -131,21 +134,23 @@ print(f"傾き（coefficient）: {model.coef_[0]}")
 print(f"切片（intercept）: {model.intercept_}")
 
 df3 = db_pd(
-    "SELECT  order_serial,juchubi,tanka,shouhin,SUM(kingaku)AS kingaku,urite_shamei,ken,gyoushu,chumon,suryou FROM order_dat_m WHERE ken=%s AND order_time>DATE_ADD(CURRENT_DATE, INTERVAL - 120 DAY) group by juchubi order by juchubi",
+    "SELECT  order_serial,max(juchubi)AS juchubi,tanka,shouhin,SUM(kingaku)AS kingaku,urite_shamei,ken,gyoushu,chumon,suryou,max(order_time)as ord FROM order_dat_m WHERE ken=%s AND order_time>DATE_ADD(CURRENT_DATE, INTERVAL - 360 DAY) group by juchubi order by ord",
     ("東京都",),
 )
 df3 = df3["data"]
 
 df3["lag_1"] = df3["kingaku"].shift(1)  # try to predict value of next day
+df3.set_index("juchubi", inplace=True)  # set juchubi as index
+df3.index = pd.to_datetime(df3.index)
 X = df3.loc[:, ["lag_1"]]
-X.dropna(inplace=True)
+X.dropna(inplace=True)  # drop n/a of x
 y = df3.loc[:, "kingaku"]  # target
-y, X = y.align(X, join="inner")  # inner:drop corresponding values in target
+y, X = y.align(X, join="inner")  # inner:drop y where there's no X
 model = LinearRegression()
 model.fit(X, y)
 y_pred = pd.Series(model.predict(X), index=X.index)
 
-plt.figure(figsize=(12, 6))
+plt.figure(figsize=(20, 6))
 
 # 実際の sales（ターゲット）
 plt.plot(y.index, y, label="Actual Sales", marker="o")
@@ -156,10 +161,64 @@ plt.plot(y_pred.index, y_pred, label="Predicted Sales (Lag Model)", linestyle="-
 plt.xlabel("Date" if isinstance(y.index[0], pd.Timestamp) else "Time")
 plt.ylabel("Sales")
 plt.title("Sales Prediction using Lag Feature (lag_1)")
+
+plt.xticks(rotation=45)
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
 plt.savefig("lagreg.png")  # まあ当然当たらん
+
+df4 = db_pd(
+    """SELECT
+    DATE(order_time) AS ord,
+    SUM(kingaku) AS sales,
+    CASE
+        WHEN order_time BETWEEN '2023-09-02' AND '2024-09-01' THEN 2024
+        WHEN order_time BETWEEN '2024-09-02' AND '2025-09-01' THEN 2025
+    END AS year
+FROM order_dat_m
+WHERE ken = %s
+  AND order_time BETWEEN '2023-09-02' AND '2025-09-01'
+GROUP BY ord, year
+ORDER BY ord, year;
+""",
+    ("東京都",),
+)
+df4 = df4["data"]
+df4["ord"] = pd.to_datetime(df4["ord"], errors="coerce")
+df4["month_day"] = df4["ord"].dt.strftime("%m-%d")
+
+df_pivot = df4.pivot(index="month_day", columns="year", values="sales").reset_index()
+
+# プロット
+plt.figure(figsize=(14, 6))
+
+for col in df_pivot.columns[1:]:  # year列だけループ
+    plt.plot(df_pivot["month_day"], df_pivot[col], marker="o", label=f"{col}年度")
+
+plt.title("Daily Sales Comparison by Month-Day")
+plt.xlabel("Month-Day")
+plt.ylabel("Sales (Kingaku)")
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.savefig("daily_sales_comparison.png")
+# 以下DID、2-3月になんか試作したつもりでやる
+df4["treatment"] = 0
+df4.loc[
+    (df4["year"] == 2025) & (df4["month_day"].between("02-01", "03-31")), "treatment"
+] = 1
+
+# postフラグ（今年の年を1、前年を0）
+df4["post"] = (df4["year"] == 2025).astype(int)
+
+# DID交互作用
+df4["did"] = df4["treatment"] * df4["post"]
+
+# DID回帰
+model = smf.ols("sales ~ treatment + post + did", data=df4).fit()
+print(model.summary())
 
 
 # 配列について
