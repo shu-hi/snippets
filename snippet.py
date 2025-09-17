@@ -246,3 +246,60 @@ print(tdict.values())
 for key in tdict.keys():
     if re.match("pg", key):
         print("{} is related with page".format(key))
+
+fruits = pd.DataFrame(
+    {"Apples": [35, 41], "Bananas": [21, 34]},
+    index=["2017 Sales", "2018 Sales"],
+)
+print(fruits.iloc[:1])
+print(fruits.loc[[0, 1], ["Apples", "Bananas"]])
+# locはsliceすると尻も含むので注意
+# top_oceania_wines = reviews.loc[(reviews.country.isin(["Australia","New Zealand"]))&(reviews.points>=95)]
+# centered_price = reviews.price-reviews.price.mean()
+# bargain_idx = (reviews.points / reviews.price).idxmax()
+# bargain_wine = reviews.loc[bargain_idx, 'title']
+# def stars(row):
+#     if row.country == 'Canada':
+#         return 3
+#     elif row.points >= 95:
+#         return 3
+#     elif row.points >= 85:
+#         return 2
+#     else:
+#         return 1
+
+# star_ratings = reviews.apply(stars, axis='columns')
+# price_extremes = reviews.groupby('variety').price.agg([min, max])
+# best_rating_per_price = reviews.groupby('price').points.max().sort_index()
+# country_variety_counts = reviews.groupby(['country','variety']).size().sort_values(ascending=False)
+# combined_products = pd.concat([gaming_products, movie_products])
+# powerlifting_combined = powerlifting_meets.set_index("MeetID").join(powerlifting_competitors.set_index("MeetID"))
+# n_missing_prices = reviews.price.isnull().sum()
+# reviews_per_region = reviews.region_1.fillna("Unknown").value_counts().sort_values(ascending=False)
+
+
+# store_sales['day']=store_sales['date'].dt.day
+
+# may_data = store_sales[store_sales['date'].dt.month == 5]
+# june_data = store_sales[store_sales['date'].dt.month == 6]
+
+# # groupby して日ごとのfamilyごとの平均売上を比較（または合計でも可）
+# may_grouped = may_data.groupby(['family', 'day'])['sales'].sum().reset_index()
+# june_grouped = june_data.groupby(['family', 'day'])['sales'].sum().reset_index()
+
+# # 比較のためにマージ（横並びで比較）
+# comparison = pd.merge(
+#     may_grouped,
+#     june_grouped,
+#     on=['family', 'day'],
+#     how='outer',
+#     suffixes=('_may', '_june')
+# )
+
+# # 欠損値を0で埋める（比較しやすく）
+# comparison.sales_may.fillna(0, inplace=True)
+# comparison.sales_june.fillna(0, inplace=True)
+
+# # 結果表示
+# print(comparison.head())
+# plt.figure(figsize=(12,6))
