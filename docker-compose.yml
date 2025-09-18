@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  fastapi:
+    build: .
+    container_name: fastapi
+    expose:
+      - "5000"
+    networks:
+      - app-network
+    volumes:
+      - ./api:/app  # ← 開発用、ビルドなし反映用
+networks:
+  app-network:
+    external: true

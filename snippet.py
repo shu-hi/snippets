@@ -49,6 +49,8 @@ def db_connect(sql, params):
 
 def db_pd(sql, params):
     """
+    sqlとparamを受けてstatus,data,errorを返す
+    paramの形によってalchemyだったりmysqlだったり
     @params string sql
     @params list/tuple params(list-->mysql,tuple-->alchemy)
 
