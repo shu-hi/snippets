@@ -1,10 +1,17 @@
 [
   {
-    "name": "dami2.seller_master",
-    "index": "serial"
+    "name": "dami2.order_dat_m",
+    "index": "order_serial",
+    "serial": 2
   },
   {
-    "name": "dami2.order_dat_m",
-    "index": "order_serial"
+    "name": "mmart_uriba.outlet_jcb_card_order",
+    "index": "serial",
+    "serial": 3
+  },
+  {
+    "name": "dami2.seller_master",
+    "index": "serial",
+    "serial": 4
   }
 ]
