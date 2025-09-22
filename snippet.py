@@ -90,6 +90,129 @@ def del_outlier(df, column):
     return df[np.abs((df[column] - df[column].mean()) / (df[column].std())) < 2]
 
 
+def convert_pref(input):
+    """
+    都道府県-郵便番号上三桁-県コード変換関数
+    どれか入れるとレコードで返す
+    """
+    pref_data = [
+        {
+            "name": "北海道",
+            "code": "01",
+            "zip": ["00", "04", "05", "06", "07", "08", "09"],
+            "area": "北海道",
+        },
+        {"name": "青森県", "code": "02", "zip": ["03"], "area": "北東北"},
+        {"name": "岩手県", "code": "03", "zip": ["02"], "area": "北東北"},
+        {"name": "宮城県", "code": "04", "zip": ["98"], "area": "南東北"},
+        {"name": "秋田県", "code": "05", "zip": ["01"], "area": "北東北"},
+        {"name": "山形県", "code": "06", "zip": ["99"], "area": "南東北"},
+        {"name": "福島県", "code": "07", "zip": ["96", "97"], "area": "南東北"},
+        {"name": "茨城県", "code": "08", "zip": ["30", "31"], "area": "関東"},
+        {"name": "栃木県", "code": "09", "zip": ["32"], "area": "関東"},
+        {"name": "群馬県", "code": "10", "zip": ["37"], "area": "関東"},
+        {
+            "name": "埼玉県",
+            "code": "11",
+            "zip": ["33", "34", "35", "36"],
+            "area": "関東",
+        },
+        {
+            "name": "千葉県",
+            "code": "12",
+            "zip": ["26", "27", "28", "29"],
+            "area": "関東",
+        },
+        {
+            "name": "東京都",
+            "code": "13",
+            "zip": ["10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+            "area": "関東",
+        },
+        {
+            "name": "神奈川県",
+            "code": "14",
+            "zip": ["21", "22", "23", "24", "25"],
+            "area": "関東",
+        },
+        {"name": "新潟県", "code": "15", "zip": ["94", "95"], "area": "信越"},
+        {"name": "富山県", "code": "16", "zip": ["93"], "area": "北陸"},
+        {"name": "石川県", "code": "17", "zip": ["92"], "area": "北陸"},
+        {"name": "福井県", "code": "18", "zip": ["91"], "area": "北陸"},
+        {"name": "山梨県", "code": "19", "zip": ["40"], "area": "関東"},
+        {"name": "長野県", "code": "20", "zip": ["38", "39"], "area": "信越"},
+        {"name": "岐阜県", "code": "21", "zip": ["50"], "area": "中部"},
+        {"name": "静岡県", "code": "22", "zip": ["41", "42", "43"], "area": "中部"},
+        {
+            "name": "愛知県",
+            "code": "23",
+            "zip": ["44", "45", "46", "47", "48", "49"],
+            "area": "中部",
+        },
+        {"name": "三重県", "code": "24", "zip": ["51"], "area": "中部"},
+        {"name": "滋賀県", "code": "25", "zip": ["52"], "area": "関西"},
+        {"name": "京都府", "code": "26", "zip": ["60", "61", "62"], "area": "関西"},
+        {
+            "name": "大阪府",
+            "code": "27",
+            "zip": ["53", "54", "55", "56", "57", "58", "59"],
+            "area": "関西",
+        },
+        {"name": "兵庫県", "code": "28", "zip": ["65", "66", "67"], "area": "関西"},
+        {"name": "奈良県", "code": "29", "zip": ["63"], "area": "関西"},
+        {"name": "和歌山県", "code": "30", "zip": ["64"], "area": "関西"},
+        {"name": "鳥取県", "code": "31", "zip": ["68"], "area": "中国"},
+        {"name": "島根県", "code": "32", "zip": ["69"], "area": "中国"},
+        {"name": "岡山県", "code": "33", "zip": ["70", "71"], "area": "中国"},
+        {"name": "広島県", "code": "34", "zip": ["72", "73"], "area": "中国"},
+        {"name": "山口県", "code": "35", "zip": ["74", "75"], "area": "中国"},
+        {"name": "徳島県", "code": "36", "zip": ["77"], "area": "四国"},
+        {"name": "香川県", "code": "37", "zip": ["76"], "area": "四国"},
+        {"name": "愛媛県", "code": "38", "zip": ["79"], "area": "四国"},
+        {"name": "高知県", "code": "39", "zip": ["78"], "area": "四国"},
+        {
+            "name": "福岡県",
+            "code": "40",
+            "zip": ["80", "81", "82", "83"],
+            "area": "九州",
+        },
+        {"name": "佐賀県", "code": "41", "zip": ["84"], "area": "九州"},
+        {"name": "長崎県", "code": "42", "zip": ["85"], "area": "九州"},
+        {"name": "熊本県", "code": "43", "zip": ["86"], "area": "九州"},
+        {"name": "大分県", "code": "44", "zip": ["87"], "area": "九州"},
+        {"name": "宮崎県", "code": "45", "zip": ["88"], "area": "九州"},
+        {"name": "鹿児島県", "code": "46", "zip": ["89"], "area": "九州"},
+        {"name": "沖縄県", "code": "47", "zip": ["90"], "area": "沖縄"},
+    ]
+
+    res = {"data": [], "status": "", "error": ""}
+    if input:
+        if isinstance(input, str) and len(input) == 2 and input.isdigit():
+            for data in pref_data:
+                if data["code"] == input:
+                    res["data"] = data
+                    break
+        elif isinstance(input, str) and len(input) == 3 and input.isdigit():
+            for data in pref_data:
+                if input[0:2] in data["zip"]:
+                    res["data"] = data
+                    break
+        else:
+            for data in pref_data:
+                if data["name"] == input:
+                    res["data"] = data
+                    break
+        if len(res["data"]) > 0:
+            res["status"] = "ok"
+        else:
+            res["status"] = "ng"
+            res["error"] = "not found"
+    else:
+        res["status"] = "ng"
+        res["error"] = "no input"
+    return res
+
+
 if __name__ == "__main__":
     df = pd.read_csv("/home/ubuntu/pandas-snippet/train.csv")
     print("read from csv\n")
