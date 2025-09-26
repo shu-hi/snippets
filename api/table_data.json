@@ -1,7 +1,17 @@
 [
   {
+    "name": "dami2.seller_master",
+    "columns": "serial,id,pass",
+    "serial": 2
+  },
+  {
+    "name": "dami2.order_dat_m",
+    "columns": "order_serial,order_time",
+    "serial": 3
+  },
+  {
     "name": "mmrt_uriba.valeur_seller_outlet",
-    "columns": "\"serial\",\"valeur_id\",\"valeur_pass\"",
-    "serial": 1
+    "columns": "serial,valeur_id,valeur_pass",
+    "serial": 4
   }
 ]

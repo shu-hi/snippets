@@ -8,6 +8,9 @@ import json
 import mysql.connector
 from sqlalchemy import create_engine
 import pandas as pd
+import matplotlib.pyplot as plt
+from fastapi.responses import StreamingResponse
+import io
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -117,10 +120,42 @@ async def execute(data: ExeData):
     return result
 
 
+@main.post("/api/head")
+async def head(data: ExeData):
+    result = await run_in_threadpool(db_pd, data.sql, data.params)
+    if result["status"] == "ok" or result["status"] == "falback":
+        result["data"] = result["data"].head().to_dict(orient="records")
+    return result
+
+
 @main.get("/api/pref")
 async def pref(data: str):
     result = await run_in_threadpool(convert_pref, data)
     return result
+
+
+@main.post("/api/plot")
+async def plot(data: ExeData):
+    result = await run_in_threadpool(db_pd, data.sql, data.params)
+    if result["status"] == "ok" or result["status"] == "falback":
+        df = result["data"]
+        plt.figure(figsize=(20, 10))
+        for i, plots in enumerate(df.columns):
+            if i == 0:
+                continue
+            else:
+                plt.plot(df[df.columns[0]], df[plots], label=plots, marker="o")
+        plt.ylabel("plots")
+        plt.xlabel(df.columns[0])
+        plt.grid(True)
+        plt.tight_layout()
+        plt.legend()
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+
+        return StreamingResponse(buffer, media_type="image/png")
 
 
 def tsv2_connection():

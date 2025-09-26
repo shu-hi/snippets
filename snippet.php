@@ -3,7 +3,7 @@
 *割と万能のsql実行php
 *   @param object $c_dbi DB接続インスタンス
 *	@param string $sql クエリ文字列のもと
-*	@param array $params プリペアードステートメントに渡す値の配列[型、値...]
+*	@param array $params プリペアードステートメントに渡す値の配列[型、値...]ex)["sis","foo",2,"bar"]
 *	@return string 実行結果
 */
 function F_exec_sql($c_dbi, $sql, $params) {

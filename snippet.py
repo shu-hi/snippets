@@ -438,3 +438,11 @@ if __name__ == "__main__":
     # # 結果表示
     # print(comparison.head())
     # plt.figure(figsize=(12,6))
+# SELECT
+#   DAY(STR_TO_DATE(juchubi, '%Y/%m/%d')) AS juchu_date,
+# SUM(CASE WHEN order_time >= '2025-06-01' AND order_time < '2025-07-01' THEN kingaku ELSE 0 END) AS total_june,
+#   SUM(CASE WHEN order_time >= '2025-07-01' AND order_time < '2025-08-01' THEN kingaku ELSE 0 END) AS total_july,
+#   SUM(CASE WHEN order_time >= '2025-08-01' AND order_time < '2025-09-01' THEN kingaku ELSE 0 END) AS total_augst
+# from dami2.order_dat_m WHERE order_time >= '2025-06-01' AND order_time < '2025-09-01'
+# GROUP BY DAY(STR_TO_DATE(juchubi, '%Y/%m/%d'))
+# ORDER BY juchu_date;こうやってクエリで処理したほうが楽かも
