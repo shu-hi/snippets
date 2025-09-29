@@ -11,6 +11,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from fastapi.responses import StreamingResponse
 import io
+import statsmodels.formula.api as smf
+import numpy as np
+import base64
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -31,6 +34,12 @@ class DellData(BaseModel):
 class ExeData(BaseModel):
     sql: str
     params: List[str]
+
+
+class DidData(BaseModel):
+    sql: str
+    params: List[str]
+    del_outlier: bool
 
 
 @main.get("/api/data")
@@ -124,7 +133,7 @@ async def execute(data: ExeData):
 async def head(data: ExeData):
     result = await run_in_threadpool(db_pd, data.sql, data.params)
     if result["status"] == "ok" or result["status"] == "falback":
-        result["data"] = result["data"].head().to_dict(orient="records")
+        result["data"] = result["data"].head(10).to_dict(orient="records")
     return result
 
 
@@ -156,6 +165,36 @@ async def plot(data: ExeData):
         buffer.seek(0)
 
         return StreamingResponse(buffer, media_type="image/png")
+
+
+@main.post("/api/did")
+async def did(data: DidData):
+    result = await run_in_threadpool(db_pd, data.sql, data.params)
+    if result["status"] == "ok" or result["status"] == "falback":
+        df = result["data"]
+        if data.del_outlier:
+            df = del_outlier(df, "target")
+        model = smf.ols("target ~ treated * C(period_flag)", data=df).fit()
+        summary_df = pd.DataFrame(
+            {
+                "Variable": model.params.index,
+                "Coef": model.params.values,
+                "StdErr": model.bse.values,
+                "t": model.tvalues.values,
+                "P>|t|": model.pvalues.values,
+                "CI_lower": model.conf_int()[0].values,
+                "CI_upper": model.conf_int()[1].values,
+                "outlier": "deleted" if data.del_outlier else "included",
+            }
+        )
+        buf = visualize_did(model)
+        img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        # JSON化しやすい形に変換
+        result["data"] = {
+            "summary": summary_df.to_dict(orient="records"),
+            "plot": img_base64,
+        }
+    return result
 
 
 def tsv2_connection():
@@ -352,3 +391,96 @@ def convert_pref(input):
         res["status"] = "ng"
         res["error"] = "no input"
     return res
+
+
+def visualize_did(model):
+    """
+    前・中・後について可視化する
+    """
+    # 回帰係数
+    params = model.params
+    pvalues = model.pvalues
+
+    intercept = params["Intercept"]
+    treated = params["treated"]
+    period1_ctrl = params.get("C(period_flag)[T.1]", 0)
+    period2_ctrl = params.get("C(period_flag)[T.2]", 0)
+    period1_trt_inter = params.get("treated:C(period_flag)[T.1]", 0)
+    period2_trt_inter = params.get("treated:C(period_flag)[T.2]", 0)
+
+    # p値
+    p_intercept = pvalues["Intercept"]
+    p_treated = pvalues["treated"]
+    p_period1_ctrl = pvalues.get("C(period_flag)[T.1]", 1)
+    p_period2_ctrl = pvalues.get("C(period_flag)[T.2]", 1)
+    p_period1_trt = pvalues.get("treated:C(period_flag)[T.1]", 1)
+    p_period2_trt = pvalues.get("treated:C(period_flag)[T.2]", 1)
+    periods = ["pre", "treatment", "post"]
+    ctrl = [intercept, intercept + period1_ctrl, intercept + period2_ctrl]
+    treat_effect = [treated, treated + period1_trt_inter, treated + period2_trt_inter]
+    treat = [
+        intercept + treated,
+        intercept + treated + period1_trt_inter,
+        intercept + treated + period2_trt_inter,
+    ]
+    ctrl_p = [p_intercept, p_period1_ctrl, p_period2_ctrl]
+    treat_p = [p_treated, p_period1_trt, p_period2_trt]
+
+    # グラフ作成
+    x = np.arange(len(periods))
+    width = 0.5
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # control 部分
+    ax.bar(x, ctrl, width, color="#a6bddb", label="control")
+
+    # treatment は control の上に積む
+    ax.bar(
+        x, treat_effect, width, bottom=ctrl, color="#2b8cbe", label="treatment (extra)"
+    )
+
+    # 棒の上に有意性を表示
+    for i, (c, p) in enumerate(zip(ctrl, ctrl_p)):
+        if p < 0.05:
+            ax.text(
+                x[i],
+                c + 0.1,
+                "*",
+                ha="center",
+                va="bottom",
+                color="black",
+                fontsize=12,
+            )
+    for i, (t, p) in enumerate(zip(treat, treat_p)):
+        if p < 0.05:
+            ax.text(
+                x[i],
+                t + 0.1,
+                "*",
+                ha="center",
+                va="bottom",
+                color="black",
+                fontsize=12,
+            )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(periods)
+    ax.set_ylabel("predicted (Coef)")
+    ax.set_title("DID: control/treatment")
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.legend()
+    buffer = io.BytesIO()
+    fig.tight_layout()
+    plt.savefig(buffer, format="png")
+    plt.close(fig)
+    buffer.seek(0)
+    return buffer
+
+
+def del_outlier(df, column):
+    """
+    外れ値を除いたものを返す
+    @params df dataframe
+    @params column str
+    """
+    return df[np.abs((df[column] - df[column].mean()) / (df[column].std())) < 2]
