@@ -14,6 +14,7 @@ import io
 import statsmodels.formula.api as smf
 import numpy as np
 import base64
+from lifelines import CoxPHFitter
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -125,7 +126,8 @@ async def del_table(data: DellData):
 async def execute(data: ExeData):
     result = await run_in_threadpool(db_pd, data.sql, data.params)
     if result["status"] == "ok" or result["status"] == "falback":
-        result["data"] = result["data"].to_dict(orient="records")
+        df = result["data"].replace([np.inf, -np.inf], np.nan).fillna(0)
+        result["data"] = df.to_dict(orient="records")
     return result
 
 
@@ -133,7 +135,8 @@ async def execute(data: ExeData):
 async def head(data: ExeData):
     result = await run_in_threadpool(db_pd, data.sql, data.params)
     if result["status"] == "ok" or result["status"] == "falback":
-        result["data"] = result["data"].head(10).to_dict(orient="records")
+        df = result["data"].replace([np.inf, -np.inf], np.nan).fillna(0)
+        result["data"] = df.head(100).to_dict(orient="records")
     return result
 
 
@@ -157,6 +160,51 @@ async def plot(data: ExeData):
         plt.ylabel("plots")
         plt.xlabel(df.columns[0])
         plt.grid(True)
+        plt.tight_layout()
+        plt.legend()
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+
+        return StreamingResponse(buffer, media_type="image/png")
+
+
+@main.post("/api/hist")
+async def hist(data: ExeData):
+    result = await run_in_threadpool(db_pd, data.sql, data.params)
+    if result["status"] == "ok" or result["status"] == "falback":
+        df = result["data"]
+
+        plt.figure(figsize=(20, 10))
+        n_cols = len(df.columns)
+        n_rows = (n_cols + 2) // 3  # 1行に3つ並べる
+
+        fig, axes = plt.subplots(n_rows, 3, figsize=(20, 5 * n_rows))
+        axes = axes.flatten()
+
+        for i, col in enumerate(df.columns):
+            ax = axes[i]
+            if df[col].dtype == "object":
+                counts = df[col].value_counts()
+                counts.plot(kind="bar", ax=ax, alpha=0.7)
+                ax.set_title(f"Value counts of {col}")
+            else:
+                df = del_outlier(df, col)
+                an, bins, patches = ax.hist(df[col].dropna(), bins=20, alpha=0.7)
+                # ビンの境界をx軸上にテキストで表示
+                for boundary in bins:
+                    ax.text(
+                        boundary,
+                        -500,
+                        f"{boundary:.1f}",
+                        rotation=90,
+                        va="bottom",
+                        ha="center",
+                        fontsize=8,
+                        color="gray",
+                    )
+                ax.set_title(f"{col}")
         plt.tight_layout()
         plt.legend()
         buffer = io.BytesIO()
@@ -194,6 +242,25 @@ async def did(data: DidData):
             "summary": summary_df.to_dict(orient="records"),
             "plot": img_base64,
         }
+    return result
+
+
+@main.post("/api/lifelines")
+async def lifelines(data: ExeData):
+    result = await run_in_threadpool(db_pd, data.sql, data.params)
+    if result["status"] == "ok" or result["status"] == "falback":
+        df = result["data"]
+        df = del_outlier(df, "duration")
+        cph = CoxPHFitter()
+        cph.fit(df, duration_col="duration", event_col="event")
+        cph.print_summary()
+        summary = cph.summary.reset_index()
+        summary = summary.rename(columns={"covariate": "variable"})
+        summary["exp(coef)"] = summary["exp(coef)"].round(3)
+        summary["p"] = summary["p"].round(4)
+        result["data"] = summary[["variable", "coef", "exp(coef)", "p"]].to_dict(
+            orient="records"
+        )
     return result
 
 
