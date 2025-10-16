@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 import pandas as pd
 import matplotlib.pyplot as plt
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 import io
 import statsmodels.formula.api as smf
 import numpy as np
@@ -22,7 +23,13 @@ load_dotenv()  # .envファイルの読み込み
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 main = FastAPI()
-
+main.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://react-sktw6qjob-shu-his-projects.vercel.app"],  # or ["*"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 FILE_PATH = "table_data.json"
 
 
