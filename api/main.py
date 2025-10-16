@@ -25,7 +25,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 main = FastAPI()
 main.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://react-sktw6qjob-shu-his-projects.vercel.app"],  # or ["*"]
+    allow_origins=["https://react-nu-pink.vercel.app"],  # or ["*"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
