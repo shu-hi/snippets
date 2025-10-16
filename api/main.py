@@ -326,6 +326,7 @@ def tsv2_connection():
         user=os.getenv("TSV2_DB_USER"),
         password=os.getenv("TSV2_DB_PASSWORD"),
         database=os.getenv("TSV2_DB_NAME"),
+        connection_timeout=3,
     )
 
 
@@ -336,7 +337,7 @@ def tsv2_engine():
     db_port = os.getenv("TSV2_DB_PORT", "3306")
     db_name = os.getenv("TSV2_DB_NAME")
 
-    url = f"mysql+mysqlconnector://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    url = f"mysql+mysqlconnector://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}?connect_timeout=3"
     return create_engine(url)
 
 
