@@ -15,6 +15,9 @@ import statsmodels.formula.api as smf
 import numpy as np
 import base64
 from lifelines import CoxPHFitter
+from dotenv import load_dotenv
+
+load_dotenv()  # .envファイルの読み込み
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -310,18 +313,23 @@ async def Linreg(data: ExeData):
 
 def tsv2_connection():
     return mysql.connector.connect(
-        host="10.0.1.46",
-        port=3306,
-        user="ai_mmart",
-        password="S76zt2zMPH",
-        database="dami2",
+        host=os.getenv("TSV2_DB_HOST"),
+        port=int(os.getenv("TSV2_DB_PORT", 3306)),
+        user=os.getenv("TSV2_DB_USER"),
+        password=os.getenv("TSV2_DB_PASSWORD"),
+        database=os.getenv("TSV2_DB_NAME"),
     )
 
 
 def tsv2_engine():
-    return create_engine(
-        "mysql+mysqlconnector://ai_mmart:S76zt2zMPH@10.0.1.46:3306/dami2"
-    )
+    db_user = os.getenv("TSV2_DB_USER")
+    db_pass = os.getenv("TSV2_DB_PASSWORD")
+    db_host = os.getenv("TSV2_DB_HOST")
+    db_port = os.getenv("TSV2_DB_PORT", "3306")
+    db_name = os.getenv("TSV2_DB_NAME")
+
+    url = f"mysql+mysqlconnector://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+    return create_engine(url)
 
 
 def db_connect(sql, params):
