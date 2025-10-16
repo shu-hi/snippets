@@ -55,7 +55,7 @@ class DidData(BaseModel):
 
 @main.get("/api/data")
 async def get_data():
-    response = {"message": "Hello-World!"}
+    response = {"message": ("TSV2_DB_PORT:" + os.getenv("TSV2_DB_PORT"))}
     return response
 
 
