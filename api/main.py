@@ -19,7 +19,8 @@ from lifelines import CoxPHFitter
 from dotenv import load_dotenv
 
 load_dotenv()  # .envファイルの読み込み
-
+if os.getenv("TSV2_DB_HOST") != "10.0.146":
+    load_dotenv("/etc/secrets/.env")
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 main = FastAPI()
