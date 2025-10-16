@@ -18,7 +18,7 @@ import base64
 from lifelines import CoxPHFitter
 from dotenv import load_dotenv
 
-load_dotenv()  # .envファイルの読み込み
+load_dotenv("/etc/secrets/.env")  # .envファイルの読み込み
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
