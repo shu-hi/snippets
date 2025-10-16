@@ -264,6 +264,50 @@ async def lifelines(data: ExeData):
     return result
 
 
+@main.post("/api/Linreg")
+async def Linreg(data: ExeData):
+    result = await run_in_threadpool(db_pd, data.sql, data.params)
+    if result["status"] == "ok" or result["status"] == "falback":
+        df = result["data"]
+        df = del_outlier(df, "target")
+        df.dropna(inplace=True)
+        df.index = np.arange(len(df.index))
+        formula = "target ~ " + " + ".join(
+            [col for col in df.columns if col != "target"]
+        )
+        model = smf.ols(formula, data=df).fit()
+        summary_df = pd.DataFrame(
+            {
+                "Variable": model.params.index,
+                "Coef": model.params.values,
+                "rsquared": model.rsquared,
+                "t": model.tvalues,
+                "P>|t|": model.pvalues,
+            }
+        )
+
+        df["predicted"] = model.predict(df)
+        plt.figure(figsize=(20, 10))
+        plt.plot(df.index, df["target"], label="Actual", marker="o")
+        plt.plot(
+            df.index,
+            df["predicted"],
+            label="Predicted(Regression Line)",
+            linestyle="--",
+        )
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+        img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+        # JSON化しやすい形に変換
+        result["data"] = {
+            "summary": summary_df.to_dict(orient="records"),
+            "plot": img_base64,
+        }
+    return result
+
+
 def tsv2_connection():
     return mysql.connector.connect(
         host="10.0.1.46",
