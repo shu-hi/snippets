@@ -1,11 +1,16 @@
 import requests
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
+from groq import Groq
+
+import func
 
 router = APIRouter()
 
-API_KEY = "AIzaSyDViYNLgQPIQjG8Pqzj76nVnBYb4wj-pOM"
-CX = "259ab40b8dcf64b08"
+envs = func.get_envs()
+CX = envs["cx"]
+API_KEY = envs["api_key"]
+GROQ = envs["groq"]
 
 
 @router.get("/api/search/{query}")
@@ -30,8 +35,28 @@ async def search(query: str):
         results.append(
             {
                 "title": item.get("title"),
-                "link": item.get("link"),
                 "snippet": item.get("snippet"),
+                "url": item.get("formattedUrl"),
             }
         )
     return results
+
+
+@router.get("/api/chat/{query}")
+async def chat(query: str):
+    client = Groq(
+        api_key=GROQ,
+    )
+
+    chat_completion = await run_in_threadpool(
+        client.chat.completions.create,
+        messages=[
+            {
+                "role": "user",
+                "content": query,
+            }
+        ],
+        model="llama-3.3-70b-versatile",
+    )
+
+    return chat_completion.choices[0].message.content

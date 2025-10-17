@@ -5,6 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import mysql.connector
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def tsv2_connection():
@@ -300,3 +303,10 @@ def del_outlier(df, column):
     @params column str
     """
     return df[np.abs((df[column] - df[column].mean()) / (df[column].std())) < 2]
+
+
+def get_envs():
+    API_KEY = os.getenv("CUSTOM_SEARCH_API_KEY", "fb")
+    CX = os.getenv("CUSTOM_SEARCH_ENGINE_ID", "fb")
+    GROQ = os.getenv("GROQ_API_KEY")
+    return {"api_key": API_KEY, "cx": CX, "groq": GROQ}
