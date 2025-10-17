@@ -13,5 +13,10 @@
     "name": "mmrt_uriba.valeur_seller_outlet",
     "columns": "serial,valeur_id,valeur_pass",
     "serial": 4
+  },
+  {
+    "name": "test",
+    "columns": "t,e,s,t",
+    "serial": 5
   }
 ]

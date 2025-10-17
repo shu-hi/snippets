@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 
-from routers import playground, bi
+from routers import playground, bi, myfinance, search
 
 load_dotenv()  # .envファイルの読み込み
 if os.getenv("TSV2_DB_HOST") != "10.0.146":
@@ -23,6 +23,8 @@ main.add_middleware(
 
 main.include_router(playground.router)
 main.include_router(bi.router)
+main.include_router(myfinance.router)
+main.include_router(search.router)
 
 
 @main.get("/api/data")

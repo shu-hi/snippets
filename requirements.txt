@@ -10,3 +10,4 @@ sqlalchemy
 statsmodels
 lifelines
 dotenv
+yfinance
