@@ -15,8 +15,8 @@
     "serial": 4
   },
   {
-    "name": "test",
-    "columns": "t,e,s,t",
-    "serial": 5
+    "name": "dami2.out_data_dat",
+    "columns": "seller_id",
+    "serial": 6
   }
 ]

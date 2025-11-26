@@ -13,5 +13,5 @@ COPY ./api .
 EXPOSE 5000
 
 # アプリを実行
-CMD ["uvicorn", "main:main", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["uvicorn", "main:main", "--host", "0.0.0.0", "--port", "5000", "--log-level", "debug"]
 

@@ -418,7 +418,7 @@ if __name__ == "__main__":
     # may_data = store_sales[store_sales['date'].dt.month == 5]
     # june_data = store_sales[store_sales['date'].dt.month == 6]
 
-    # # groupby して日ごとのfamilyごとの平均売上を比較（または合計でも可）
+    # # groupby して日ごとのfamilyごとの平均売上を比較（または合計でも可） groupby(column_name).agg(new_name=('old_name','mean'),new_name_2=('old_name_2','sum'))みたいなことができる
     # may_grouped = may_data.groupby(['family', 'day'])['sales'].sum().reset_index()
     # june_grouped = june_data.groupby(['family', 'day'])['sales'].sum().reset_index()
 
