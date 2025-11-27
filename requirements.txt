@@ -12,3 +12,5 @@ lifelines
 dotenv
 yfinance
 groq
+faiss-cpu
+python-multipart

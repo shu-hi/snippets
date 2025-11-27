@@ -306,7 +306,8 @@ def del_outlier(df, column):
 
 
 def get_envs():
-    API_KEY = os.getenv("CUSTOM_SEARCH_API_KEY", "fb")
+    CS_API_KEY = os.getenv("CUSTOM_SEARCH_API_KEY", "fb")
     CX = os.getenv("CUSTOM_SEARCH_ENGINE_ID", "fb")
     GROQ = os.getenv("GROQ_API_KEY")
-    return {"api_key": API_KEY, "cx": CX, "groq": GROQ}
+    HF_API_KEY = os.getenv("HF_API_KEY")
+    return {"cs_api_key": CS_API_KEY, "cx": CX, "groq": GROQ, "hf": HF_API_KEY}
