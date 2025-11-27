@@ -175,7 +175,7 @@ async def sentence_embed(query: list):
         return embeddings
     else:
         raise Exception(
-            f"Error fetching embeddings from Hugging Face API: {response.text}"
+            f"Error fetching embeddings from Hugging Face API: {response.text}api_key:{HF}"
         )
 
 
