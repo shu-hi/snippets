@@ -12,6 +12,7 @@ import faiss
 import httpx
 import os
 from io import BytesIO
+import json
 
 router = APIRouter()
 
@@ -100,7 +101,8 @@ async def streamchat(query: str):
 
 @router.get("/api/sentence_embedding/{query}")
 async def sentence_embedding(query: str):
-    return await sentence_embed(query)
+    processed_sentence = await sentence_embed([query])
+    return processed_sentence.tolist()
 
 
 @router.post("/api/make_faiss")
@@ -175,7 +177,7 @@ async def sentence_embed(query: list):
         return embeddings
     else:
         raise Exception(
-            f"Error fetching embeddings from Hugging Face API: {response.text}api_key:{HF}"
+            f"Error fetching embeddings from Hugging Face API: {response.text}envs:{json.dumps(envs)}"
         )
 
 
