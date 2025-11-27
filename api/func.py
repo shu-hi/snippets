@@ -8,6 +8,8 @@ from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
 load_dotenv()
+if os.getenv("TSV2_DB_HOST") != "10.0.146":
+    load_dotenv("/etc/secrets/.env")
 
 
 def tsv2_connection():
