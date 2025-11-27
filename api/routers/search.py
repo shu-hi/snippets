@@ -100,7 +100,7 @@ async def streamchat(query: str):
 
 @router.get("/api/sentence_embedding/{query}")
 async def sentence_embedding(query: str):
-    return sentence_embed(query)
+    return await sentence_embed(query)
 
 
 @router.post("/api/make_faiss")

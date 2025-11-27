@@ -29,5 +29,5 @@ main.include_router(search.router)
 
 @main.get("/api/data")
 async def get_data():
-    response = {"message": ("TSV2_DB_PORT:" + os.getenv("TSV2_DB_PORT"))}
+    response = {"message": ("HF_API_KEY:" + os.getenv("HF_API_KEY"))}
     return response
