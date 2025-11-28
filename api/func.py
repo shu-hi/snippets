@@ -7,7 +7,7 @@ import mysql.connector
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # func.pyもそうだが、envの読み込みは要工夫
 if os.getenv("TSV2_DB_HOST") != "10.0.146":
     load_dotenv("/etc/secrets/.env")
 
