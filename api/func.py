@@ -6,31 +6,45 @@ import matplotlib.pyplot as plt
 import mysql.connector
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
+import psycopg2
 
 load_dotenv()  # func.pyもそうだが、envの読み込みは要工夫
-if os.getenv("TSV2_DB_HOST") != "10.0.146":
+if os.getenv("ENV") != "DEV":
     load_dotenv("/etc/secrets/.env")
 
 
-def tsv2_connection():
-    return mysql.connector.connect(
-        host=os.getenv("TSV2_DB_HOST"),
-        port=int(os.getenv("TSV2_DB_PORT", 3306)),
-        user=os.getenv("TSV2_DB_USER"),
-        password=os.getenv("TSV2_DB_PASSWORD"),
-        database=os.getenv("TSV2_DB_NAME"),
-        connection_timeout=3,
-    )
+def connection():
+    if os.getenv("ENV") == "DEV":
+        return mysql.connector.connect(
+            host=os.getenv("DB_HOST"),
+            port=int(os.getenv("DB_PORT", 3306)),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            database=os.getenv("DB_NAME"),
+            connection_timeout=3,
+        )
+    else:
+        return psycopg2.connect(
+            host=os.getenv("DB_HOST"),
+            port=int(os.getenv("DB_PORT", 5432)),  # PostgreSQLのデフォルトポートは5432
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            database=os.getenv("DB_NAME"),
+            connect_timeout=3,
+        )
 
 
-def tsv2_engine():
-    db_user = os.getenv("TSV2_DB_USER")
-    db_pass = os.getenv("TSV2_DB_PASSWORD")
-    db_host = os.getenv("TSV2_DB_HOST")
-    db_port = os.getenv("TSV2_DB_PORT", "3306")
-    db_name = os.getenv("TSV2_DB_NAME")
-
-    url = f"mysql+mysqlconnector://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}?connect_timeout=3"
+def engine():
+    db_user = os.getenv("DB_USER")
+    db_pass = os.getenv("DB_PASSWORD")
+    db_host = os.getenv("DB_HOST")
+    db_name = os.getenv("DB_NAME")
+    if os.getenv("ENV") == "DEV":
+        db_port = os.getenv("DB_PORT", "3306")
+        url = f"mysql+mysqlconnector://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}?connect_timeout=3"
+    else:
+        db_port = os.getenv("DB_PORT", "3306")
+        url = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}?connect_timeout=3"
     return create_engine(url)
 
 
@@ -39,7 +53,7 @@ def db_connect(sql, params):
     classic sql executer
     """
     try:
-        conn6 = tsv2_connection()
+        conn6 = connection()
         cursor6 = conn6.cursor(dictionary=True, buffered=True)
         cursor6.execute(sql, params)
         rserials = cursor6.fetchall()
@@ -68,12 +82,12 @@ def db_pd(sql, params):
     res = {"status": "error", "data": "", "error": ""}
     con = None
     try:
-        con = tsv2_engine()
+        con = engine()
         res["data"] = pd.read_sql(sql=sql, con=con, params=params)
         res["status"] = "ok"
     except Exception as e:
         try:
-            con = tsv2_connection()
+            con = connection()
             res["data"] = pd.read_sql(sql=sql, con=con, params=params)
             res["status"] = "fallback"
             res["error"] = str(e)
@@ -312,4 +326,11 @@ def get_envs():
     CX = os.getenv("CUSTOM_SEARCH_ENGINE_ID", "fb")
     GROQ = os.getenv("GROQ_API_KEY")
     HF_API_KEY = os.getenv("HF_API_KEY")
-    return {"cs_api_key": CS_API_KEY, "cx": CX, "groq": GROQ, "hf": HF_API_KEY}
+    ESTAT_API_KEY = os.getenv("ESTAT_API_KEY")
+    return {
+        "cs_api_key": CS_API_KEY,
+        "cx": CX,
+        "groq": GROQ,
+        "hf": HF_API_KEY,
+        "estat": ESTAT_API_KEY,
+    }

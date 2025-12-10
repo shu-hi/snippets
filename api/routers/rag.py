@@ -149,7 +149,7 @@ async def sentence_embed(query: list):
         )
 
 
-@router.get("/api/rag_doc/{query}")
+@router.get("/api/rag_doc/{query}")  # どれが選ばれたか確認用
 async def rag_doc(query: str):
     embed_query = await sentence_embed(query)
     embed_query = np.expand_dims(embed_query, axis=0)

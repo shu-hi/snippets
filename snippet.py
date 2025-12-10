@@ -22,7 +22,7 @@ def tsv2_connection():
 def tsv2_engine():
     return create_engine(
         "mysql+mysqlconnector://ai_mmart:S76zt2zMPH@10.0.1.46:3306/dami2"
-    )
+    )  # //user-name:user-pass@ip:port/db-name
 
 
 def db_connect(sql, params):

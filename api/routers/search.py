@@ -11,6 +11,7 @@ CX = envs["cx"]
 CS_API_KEY = envs["cs_api_key"]
 GROQ = envs["groq"]
 HF = envs["hf"]
+ESTAT = envs["estat"]
 logging.basicConfig(level=logging.INFO)
 
 
@@ -41,3 +42,29 @@ async def search(query: str):
             }
         )
     return results
+
+
+@router.get("/api/estat_data/{code}")
+async def estat_data(code: str):
+    url = (
+        "https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData?appId="
+        + ESTAT
+        + "&statsDataId="
+        + code
+    )
+    response = await run_in_threadpool(requests.get, url)
+    data = response.json()
+    return data
+
+
+@router.get("/api/estat_meta/{code}")
+async def estat_meta(code: str):
+    url = (
+        "https://api.e-stat.go.jp/rest/3.0/app/json/getMetaInfo?appId="
+        + ESTAT
+        + "&statsDataId="
+        + code
+    )
+    response = await run_in_threadpool(requests.get, url)
+    data = response.json()
+    return data
