@@ -24,7 +24,7 @@ def connection():
             connection_timeout=3,
         )
     else:
-        return psycopg2.connect(
+        return psycopg2.connect(  # ipv6でしか直アクセスはできないので、pooler経由になる。https://supabase.com/docs/guides/database/connecting-to-postgres#connection-pooler 参照。なおuserも変わるので注意
             host=os.getenv("DB_HOST"),
             port=int(os.getenv("DB_PORT", 5432)),  # PostgreSQLのデフォルトポートは5432
             user=os.getenv("DB_USER"),

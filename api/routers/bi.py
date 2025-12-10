@@ -10,9 +10,10 @@ import statsmodels.formula.api as smf
 import numpy as np
 import base64
 from lifelines import CoxPHFitter
-
+import logging
 import func
 
+logging.basicConfig(level=logging.INFO)
 router = APIRouter()
 
 
@@ -30,15 +31,19 @@ class DidData(BaseModel):
 @router.post("/api/execute")
 async def execute(data: ExeData):
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
-    if result["status"] == "ok" or result["status"] == "falback":
+    logging.info(result)
+    if (result["status"] == "ok") or (result["status"] == "fallback"):
         df = result["data"].replace([np.inf, -np.inf], np.nan).fillna(0)
         result["data"] = df.to_dict(orient="records")
+    else:
+        result["data"] = "error"
     return result
 
 
 @router.post("/api/head")
 async def head(data: ExeData):
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
+
     if result["status"] == "ok" or result["status"] == "falback":
         df = result["data"].replace([np.inf, -np.inf], np.nan).fillna(0)
         result["data"] = df.head(100).to_dict(orient="records")
