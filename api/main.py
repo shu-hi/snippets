@@ -5,10 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 
-from routers import playground, bi, myfinance, search, rag
+from routers import playground, bi, myfinance, search, rag, real_estate
 
 load_dotenv()  # .envファイルの読み込み
-if os.getenv("TSV2_DB_HOST") != "10.0.146":
+if os.getenv("ENV") != "DEV":
     load_dotenv("/etc/secrets/.env")
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -26,6 +26,7 @@ main.include_router(bi.router)
 main.include_router(myfinance.router)
 main.include_router(search.router)
 main.include_router(rag.router)
+main.include_router(real_estate.router)
 
 
 @main.get("/api/data")

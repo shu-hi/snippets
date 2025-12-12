@@ -327,10 +327,12 @@ def get_envs():
     GROQ = os.getenv("GROQ_API_KEY")
     HF_API_KEY = os.getenv("HF_API_KEY")
     ESTAT_API_KEY = os.getenv("ESTAT_API_KEY")
+    REAL_ESTATE_API = os.getenv("REAL_ESTATE_API")
     return {
         "cs_api_key": CS_API_KEY,
         "cx": CX,
         "groq": GROQ,
         "hf": HF_API_KEY,
         "estat": ESTAT_API_KEY,
+        "estate": REAL_ESTATE_API,
     }

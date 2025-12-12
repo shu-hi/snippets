@@ -15,3 +15,5 @@ groq
 faiss-cpu
 python-multipart
 psycopg2-binary
+jageocoder
+geopandas
