@@ -17,3 +17,4 @@ python-multipart
 psycopg2-binary
 jageocoder
 geopandas
+folium

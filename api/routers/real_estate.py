@@ -6,6 +6,8 @@ import numpy as np
 import jageocoder
 import geopandas as gpd
 import pandas as pd
+import folium
+from fastapi.responses import HTMLResponse
 
 jageocoder.init(url="https://jageocoder.info-proto.com/jsonrpc")
 
@@ -62,10 +64,52 @@ async def estat_data(code: str):
             summary[i][str(5 * y - 5) + "-" + str(5 * y - 1) + "歳"] = df[
                 "PT" + f"{y:02}" + "_" + str(i)
             ].sum()
-    return {
-        "summary": summary,
-        "latlon": user_data["features"][0]["geometry"]["coordinates"],
-    }
+    m = folium.Map(
+        location=[
+            address_data["candidates"][0]["y"],
+            address_data["candidates"][0]["x"],
+        ],
+        zoom_start=15,
+    )
+    tile_size = 256
+    folium.Marker(
+        location=[
+            (address_data["candidates"][0]["y"]),
+            (address_data["candidates"][0]["x"]),
+        ]
+    ).add_to(m)
+    folium.Marker(
+        location=[
+            (address_data["candidates"][0]["y"]) * tile_size - tile_size // 2,
+            (address_data["candidates"][0]["x"]) * tile_size - tile_size // 2,
+        ]
+    ).add_to(m)
+    folium.Marker(
+        location=[
+            (address_data["candidates"][0]["y"]) * tile_size - tile_size // 2,
+            (address_data["candidates"][0]["x"]) * tile_size + tile_size // 2,
+        ]
+    ).add_to(m)
+    folium.Marker(
+        location=[
+            (address_data["candidates"][0]["y"]) * tile_size + tile_size // 2,
+            (address_data["candidates"][0]["x"]) * tile_size - tile_size // 2,
+        ]
+    ).add_to(m)
+    folium.Marker(
+        location=[
+            (address_data["candidates"][0]["y"]) * tile_size + tile_size // 2,
+            (address_data["candidates"][0]["x"]) * tile_size + tile_size // 2,
+        ]
+    ).add_to(m)
+
+    map_html = m._repr_html_()
+    # return {
+    #     "summary": summary,
+    #     "lat": address_data["candidates"][0]["y"],
+    #     "lng": address_data["candidates"][0]["x"],
+    # }
+    return HTMLResponse(content=map_html)
 
 
 def latlon2tile(lon, lat, z):
