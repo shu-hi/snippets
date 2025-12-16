@@ -1,5 +1,5 @@
 import requests
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 import func
 import logging
 import numpy as np
@@ -8,18 +8,23 @@ import geopandas as gpd
 import pandas as pd
 import folium
 from fastapi.responses import HTMLResponse
+import math
+import datetime
 
+today = datetime.date.today()
+this_year = int(today.year)
 jageocoder.init(url="https://jageocoder.info-proto.com/jsonrpc")
 
-target = dict(address="東京都足立区綾瀬")
+
 router = APIRouter()
 
 envs = func.get_envs()
 ESTATE = envs["estate"]
+ESTAT = envs["estat"]
 logging.basicConfig(level=logging.INFO)
 
 
-@router.get("/api/real_estate/{code}")
+@router.get("/api/q2tile/{code}")
 async def estat_data(code: str):
     target = {}
     address_data = jageocoder.search(code.replace(" ", ""))
@@ -36,79 +41,60 @@ async def estat_data(code: str):
 
     # タイル情報取得
     zoom_level = 15  # 14:約2.45キロ 15:約1.22キロ
-    target["lat_lon"] = [
-        address_data["candidates"][0]["y"],
-        address_data["candidates"][0]["x"],
-    ]
+    y = address_data["candidates"][0]["y"]
+    x = address_data["candidates"][0]["x"]
+    population = get_population(x, y, zoom_level)
+    population_rate = get_population_rate(address_data)
+    return {
+        "x": x,
+        "y": y,
+        "zoom_level": zoom_level,
+        "population": {
+            "years": population.index.tolist(),
+            "ages": population.columns.tolist(),
+            "data": population.values.tolist(),
+        },
+        "population_rate": population_rate,
+    }
 
-    tile = latlon2tile(target["lat_lon"][1], target["lat_lon"][0], zoom_level)
-    # return tile
-    url = "https://www.reinfolib.mlit.go.jp/ex-api/external/XKT013"
-    params = {"response_format": "geojson", "z": zoom_level, "x": tile[1], "y": tile[0]}
-    response = requests.get(
-        url, headers={"Ocp-Apim-Subscription-Key": ESTATE}, params=params
-    )
-    user_data = response.json()
-    # return user_data
-    p_list = []
-    for properties in user_data["features"]:
-        property = properties["properties"]
-        # propertiesの中の各キーを1行の辞書としてリストに追加
-        p_list.append(property)
-    df = pd.DataFrame(p_list)
-    summary = {}
-    for i in range(2025, 2070, 5):
-        for y in range(1, 20, 1):
-            if i not in summary:
-                summary[i] = {}
-            summary[i][str(5 * y - 5) + "-" + str(5 * y - 1) + "歳"] = df[
-                "PT" + f"{y:02}" + "_" + str(i)
-            ].sum()
+
+@router.get("/api/tile2map")
+async def tile2map(
+    request: Request,
+    x: float,
+    y: float,
+    zoom_level: int,
+):
+    tile = latlon2tile(x, y, zoom_level)
+
     m = folium.Map(
         location=[
-            address_data["candidates"][0]["y"],
-            address_data["candidates"][0]["x"],
+            y,
+            x,
         ],
         zoom_start=15,
+        width=800,
     )
-    tile_size = 256
     folium.Marker(
         location=[
-            (address_data["candidates"][0]["y"]),
-            (address_data["candidates"][0]["x"]),
+            (y),
+            (x),
         ]
     ).add_to(m)
-    folium.Marker(
-        location=[
-            (address_data["candidates"][0]["y"]) * tile_size - tile_size // 2,
-            (address_data["candidates"][0]["x"]) * tile_size - tile_size // 2,
-        ]
-    ).add_to(m)
-    folium.Marker(
-        location=[
-            (address_data["candidates"][0]["y"]) * tile_size - tile_size // 2,
-            (address_data["candidates"][0]["x"]) * tile_size + tile_size // 2,
-        ]
-    ).add_to(m)
-    folium.Marker(
-        location=[
-            (address_data["candidates"][0]["y"]) * tile_size + tile_size // 2,
-            (address_data["candidates"][0]["x"]) * tile_size - tile_size // 2,
-        ]
-    ).add_to(m)
-    folium.Marker(
-        location=[
-            (address_data["candidates"][0]["y"]) * tile_size + tile_size // 2,
-            (address_data["candidates"][0]["x"]) * tile_size + tile_size // 2,
-        ]
+    folium.Polygon(
+        locations=[
+            tile2latlon(tile[1], tile[0], zoom_level),
+            tile2latlon(tile[1] + 1, tile[0], zoom_level),
+            tile2latlon(tile[1] + 1, tile[0] + 1, zoom_level),
+            tile2latlon(tile[1], tile[0] + 1, zoom_level),
+        ],
+        color="blue",
+        weight=1,
+        fill=True,
+        fill_opacity=0.5,
     ).add_to(m)
 
     map_html = m._repr_html_()
-    # return {
-    #     "summary": summary,
-    #     "lat": address_data["candidates"][0]["y"],
-    #     "lng": address_data["candidates"][0]["x"],
-    # }
     return HTMLResponse(content=map_html)
 
 
@@ -121,6 +107,13 @@ def latlon2tile(lon, lat, z):
         ((-np.log(np.tan((45 + lat / 2) * np.pi / 180)) + np.pi) * 2**z / (2 * np.pi))
     )  # y座標
     return [y, x]
+
+
+def tile2latlon(xtile, ytile, z):
+    n = 2**z
+    lon = xtile / n * 360.0 - 180.0
+    lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * ytile / n))))
+    return lat, lon
 
 
 DESIGNATED_CITY = [
@@ -141,25 +134,6 @@ DESIGNATED_CITY = [
     "熊本市",
     "鹿児島市",
 ]
-
-
-def get_9tiles_data(url, params):
-    """
-    該当タイルの周りまで取得
-    """
-    gdf_list = []
-    for i in [-1, 0, 1]:
-        for j in [-1, 0, 1]:
-            new_params = params.copy()
-            new_params["x"] = params["x"] + i
-            new_params["y"] = params["y"] + j
-            gdf = api2df(url, new_params)
-            if len(gdf) > 0:
-                gdf_list.append(gdf)
-    if len(gdf_list) > 0:
-        return pd.concat(gdf_list)
-    else:
-        return pd.DataFrame()
 
 
 def api2df(url, params):
@@ -184,3 +158,69 @@ def api2df(url, params):
             return pd.DataFrame()
     else:
         return pd.DataFrame()
+
+
+def round5(x):
+    if x >= 0:
+        return math.floor(x / 5) * 5
+    else:
+        return 0
+
+
+def get_population(x, y, zoom_level):
+    tile = latlon2tile(x, y, zoom_level)
+    url = "https://www.reinfolib.mlit.go.jp/ex-api/external/XKT013"
+    params = {"response_format": "geojson", "z": zoom_level, "x": tile[1], "y": tile[0]}
+    response = requests.get(
+        url, headers={"Ocp-Apim-Subscription-Key": ESTATE}, params=params
+    )
+    user_data = response.json()
+    # return user_data
+    p_list = []
+    for properties in user_data["features"]:
+        property = properties["properties"]
+        # propertiesの中の各キーを1行の辞書としてリストに追加
+        p_list.append(property)
+    df = pd.DataFrame(p_list)
+    long = df.filter(regex=r"^PT\d{2}_\d{4}$").melt(var_name="key", value_name="value")
+
+    long[["age", "year"]] = long["key"].str.extract(r"PT(\d{2})_(\d{4})").astype(int)
+
+    population = long.groupby(["year", "age"])["value"].sum().unstack("age")
+    population = population.iloc[:, 1:]
+    population.columns = [
+        f"{5 * a - 5}-{5 * a - 1}歳" for a in population.columns if a > 0
+    ]
+    return population
+
+
+def get_population_rate(address_data):
+    # tile = latlon2tile(x, y, zoom_level)
+    df = func.get_estimated_per_pref(address_data["candidates"][0]["fullname"][0])
+    print("df", df)
+    return df
+    url = (
+        "https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData?appId="
+        + ESTAT
+        + "&statsDataId="
+        + "00200524"
+    )
+    response = requests.get(url)
+    user_data = response.json()
+    return user_data
+    p_list = []
+    for properties in user_data["features"]:
+        property = properties["properties"]
+        # propertiesの中の各キーを1行の辞書としてリストに追加
+        p_list.append(property)
+    df = pd.DataFrame(p_list)
+    long = df.filter(regex=r"^PT\d{2}_\d{4}$").melt(var_name="key", value_name="value")
+
+    long[["age", "year"]] = long["key"].str.extract(r"PT(\d{2})_(\d{4})").astype(int)
+
+    population = long.groupby(["year", "age"])["value"].sum().unstack("age")
+    population = population.iloc[:, 1:]
+    population.columns = [
+        f"{5 * a - 5}-{5 * a - 1}歳" for a in population.columns if a > 0
+    ]
+    return population

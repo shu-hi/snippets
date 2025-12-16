@@ -321,6 +321,13 @@ def del_outlier(df, column):
     return df[np.abs((df[column] - df[column].mean()) / (df[column].std())) < 2]
 
 
+def get_estimated_per_pref(pref_name):
+    """https://www.ipss.go.jp/pp-shicyoson/j/shicyoson18/1kouhyo/gaiyo_a.pdf
+    page 18から手動で持ってきた"""
+    df = pd.read_csv("estimated_population_per_pref.csv")
+    return df.loc[df["pref"] == pref_name]
+
+
 def get_envs():
     CS_API_KEY = os.getenv("CUSTOM_SEARCH_API_KEY", "fb")
     CX = os.getenv("CUSTOM_SEARCH_ENGINE_ID", "fb")
