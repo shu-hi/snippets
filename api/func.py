@@ -324,8 +324,15 @@ def del_outlier(df, column):
 def get_estimated_per_pref(pref_name):
     """https://www.ipss.go.jp/pp-shicyoson/j/shicyoson18/1kouhyo/gaiyo_a.pdf
     page 18から手動で持ってきた"""
-    df = pd.read_csv("estimated_population_per_pref.csv")
-    return df.loc[df["pref"] == pref_name]
+    df = pd.read_csv("estimated_population_per_city.csv")
+    return df.loc[df["name"] == pref_name]
+
+
+def get_estimated_per_city(city_name):
+    """https://www.ipss.go.jp/pp-shicyoson/j/shicyoson18/1kouhyo/gaiyo_a.pdf
+    page 67から手動で持ってきた"""
+    df = pd.read_csv("estimated_population_per_city.csv")
+    return df.loc[df["name"] == city_name]
 
 
 def get_envs():

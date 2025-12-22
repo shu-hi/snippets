@@ -43,7 +43,7 @@ async def estat_data(code: str):
     zoom_level = 15  # 14:約2.45キロ 15:約1.22キロ
     y = address_data["candidates"][0]["y"]
     x = address_data["candidates"][0]["x"]
-    population = get_population(x, y, zoom_level)
+    first_column, population = get_population(x, y, zoom_level)
     population_rate = get_population_rate(address_data)
     return {
         "x": x,
@@ -53,8 +53,12 @@ async def estat_data(code: str):
             "years": population.index.tolist(),
             "ages": population.columns.tolist(),
             "data": population.values.tolist(),
+            "sum": first_column.values.tolist(),
         },
-        "population_rate": population_rate,
+        "population_rate": {
+            "year": population_rate.columns.tolist(),
+            "data": population_rate.values.tolist(),
+        },
     }
 
 
@@ -187,40 +191,16 @@ def get_population(x, y, zoom_level):
     long[["age", "year"]] = long["key"].str.extract(r"PT(\d{2})_(\d{4})").astype(int)
 
     population = long.groupby(["year", "age"])["value"].sum().unstack("age")
+    first_column = population.iloc[:, 0]
     population = population.iloc[:, 1:]
     population.columns = [
         f"{5 * a - 5}-{5 * a - 1}歳" for a in population.columns if a > 0
     ]
-    return population
+    return first_column, population
 
 
 def get_population_rate(address_data):
-    # tile = latlon2tile(x, y, zoom_level)
-    df = func.get_estimated_per_pref(address_data["candidates"][0]["fullname"][0])
-    print("df", df)
+    pref = func.get_estimated_per_pref(address_data["candidates"][0]["fullname"][0])
+    city = func.get_estimated_per_city(address_data["candidates"][0]["fullname"][1])
+    df = pd.concat([pref, city], ignore_index=True)
     return df
-    url = (
-        "https://api.e-stat.go.jp/rest/3.0/app/json/getStatsData?appId="
-        + ESTAT
-        + "&statsDataId="
-        + "00200524"
-    )
-    response = requests.get(url)
-    user_data = response.json()
-    return user_data
-    p_list = []
-    for properties in user_data["features"]:
-        property = properties["properties"]
-        # propertiesの中の各キーを1行の辞書としてリストに追加
-        p_list.append(property)
-    df = pd.DataFrame(p_list)
-    long = df.filter(regex=r"^PT\d{2}_\d{4}$").melt(var_name="key", value_name="value")
-
-    long[["age", "year"]] = long["key"].str.extract(r"PT(\d{2})_(\d{4})").astype(int)
-
-    population = long.groupby(["year", "age"])["value"].sum().unstack("age")
-    population = population.iloc[:, 1:]
-    population.columns = [
-        f"{5 * a - 5}-{5 * a - 1}歳" for a in population.columns if a > 0
-    ]
-    return population
