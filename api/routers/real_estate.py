@@ -44,7 +44,7 @@ async def estat_data(code: str):
     y = address_data["candidates"][0]["y"]
     x = address_data["candidates"][0]["x"]
     first_column, population = get_population(x, y, zoom_level)
-    population_rate = get_population_rate(address_data)
+    population_rate = get_population_rate(target)
     return {
         "x": x,
         "y": y,
@@ -59,6 +59,8 @@ async def estat_data(code: str):
             "year": population_rate.columns.tolist(),
             "data": population_rate.values.tolist(),
         },
+        "pref": address_data["candidates"][0]["fullname"][0],
+        "city": target["city"],
     }
 
 
@@ -199,8 +201,8 @@ def get_population(x, y, zoom_level):
     return first_column, population
 
 
-def get_population_rate(address_data):
-    pref = func.get_estimated_per_pref(address_data["candidates"][0]["fullname"][0])
-    city = func.get_estimated_per_city(address_data["candidates"][0]["fullname"][1])
+def get_population_rate(target):
+    pref = func.get_estimated_per_pref(target["pref"])
+    city = func.get_estimated_per_city(target["city"])
     df = pd.concat([pref, city], ignore_index=True)
     return df
