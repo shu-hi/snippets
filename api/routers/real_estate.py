@@ -60,6 +60,7 @@ async def estat_data(code: str):
             "data": population_rate.values.tolist(),
         },
         "pref": address_data["candidates"][0]["fullname"][0],
+        "ward": target["ward"],
         "city": target["city"],
     }
 
@@ -204,5 +205,7 @@ def get_population(x, y, zoom_level):
 def get_population_rate(target):
     pref = func.get_estimated_per_pref(target["pref"])
     city = func.get_estimated_per_city(target["city"])
+    if not city:
+        city = func.get_estimated_per_city(target["ward"])
     df = pd.concat([pref, city], ignore_index=True)
     return df
