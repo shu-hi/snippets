@@ -86,7 +86,8 @@ async def tile2map(
         location=[
             (y),
             (x),
-        ]
+        ],
+        icon=folium.Icon(color="red"),
     ).add_to(m)
     folium.Polygon(
         locations=[
@@ -100,7 +101,15 @@ async def tile2map(
         fill=True,
         fill_opacity=0.5,
     ).add_to(m)
-
+    land_price = get_landprice(x, y, zoom_level)
+    for index, row in land_price.iterrows():
+        folium.Marker(
+            location=[
+                (row["y"]),
+                (row["x"]),
+            ],
+            popup=f"公示地価:{row['u_current_years_price_ja']}\n前年比:{row['year_on_year_change_rate']}",
+        ).add_to(m)
     map_html = m._repr_html_()
     return HTMLResponse(content=map_html)
 
@@ -208,4 +217,29 @@ def get_population_rate(target):
     if city.empty:
         city = func.get_estimated_per_city(target["ward"])
     df = pd.concat([pref, city], ignore_index=True)
+    return df
+
+
+def get_landprice(x: float, y: float, zoom_level: int):
+    tile = latlon2tile(x, y, zoom_level)
+    url = "https://www.reinfolib.mlit.go.jp/ex-api/external/XPT002"
+    params = {
+        "response_format": "geojson",
+        "z": zoom_level,
+        "x": tile[1],
+        "y": tile[0],
+        "year": this_year,
+    }
+    response = requests.get(
+        url, headers={"Ocp-Apim-Subscription-Key": ESTATE}, params=params
+    )
+    user_data = response.json()
+    p_list = []
+    for feature in user_data["features"]:
+        tmp_list = feature["properties"].copy()
+        tmp_list["x"] = feature["geometry"]["coordinates"][0]
+        tmp_list["y"] = feature["geometry"]["coordinates"][1]
+        p_list.append(tmp_list)
+    df = pd.DataFrame(p_list)
+
     return df
