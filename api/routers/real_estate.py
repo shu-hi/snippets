@@ -71,6 +71,7 @@ async def tile2map(
     x: float,
     y: float,
     zoom_level: int,
+    window_width: int,
 ):
     tile = latlon2tile(x, y, zoom_level)
 
@@ -80,7 +81,7 @@ async def tile2map(
             x,
         ],
         zoom_start=15,
-        width=800,
+        width=window_width,
     )
     folium.Marker(
         location=[
