@@ -18,3 +18,4 @@ psycopg2-binary
 jageocoder
 geopandas
 folium
+python-jose

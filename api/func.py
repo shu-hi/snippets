@@ -9,12 +9,12 @@ from dotenv import load_dotenv
 import psycopg2
 
 load_dotenv()  # func.pyもそうだが、envの読み込みは要工夫
-if os.getenv("ENV") != "DEV":
+if os.getenv("ENV") != "DEV" and os.getenv("ENV") != "TSV2":
     load_dotenv("/etc/secrets/.env")
 
 
 def connection():
-    if os.getenv("ENV") == "DEV":
+    if os.getenv("ENV") == "TSV2":
         return mysql.connector.connect(
             host=os.getenv("DB_HOST"),
             port=int(os.getenv("DB_PORT", 3306)),
@@ -39,7 +39,7 @@ def engine():
     db_pass = os.getenv("DB_PASSWORD")
     db_host = os.getenv("DB_HOST")
     db_name = os.getenv("DB_NAME")
-    if os.getenv("ENV") == "DEV":
+    if os.getenv("ENV") == "TSV2":
         db_port = os.getenv("DB_PORT", "3306")
         url = f"mysql+mysqlconnector://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}?connect_timeout=3"
     else:
@@ -82,25 +82,16 @@ def db_pd(sql, params):
     res = {"status": "error", "data": "", "error": ""}
     con = None
     try:
-        con = engine()
+        if type(params) is list:
+            con = connection()
+        elif type(params) is tuple or params is None or not params:
+            con = engine()
+        else:
+            raise Exception("invalid params" + str(type(params)))
         res["data"] = pd.read_sql(sql=sql, con=con, params=params)
         res["status"] = "ok"
     except Exception as e:
-        try:
-            con = connection()
-            res["data"] = pd.read_sql(sql=sql, con=con, params=params)
-            res["status"] = "fallback"
-            res["error"] = str(e)
-        except Exception as e2:
-            res["status"] = "ng"
-            res["error"] = str(e2)
-
-    finally:
-        if con:
-            try:
-                con.close()
-            except Exception:
-                pass
+        res["error"] = str(e)
     return res
 
 
