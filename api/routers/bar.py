@@ -66,7 +66,10 @@ async def login(request: LoginRequest):
             user = result["data"][0]  # Assuming the user data is returned here
             # Create JWT access token
             access_token = create_access_token(data={"sub": user["serial"]})
-            result["data"] = {"access_token": access_token, "token_type": "bearer"}
+            result["data"] = {
+                "access_token": access_token,
+                "job_class": user["job_class"],
+            }
             result["status"] = "ok"
         else:
             result["status"] = "ng"
