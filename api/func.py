@@ -84,12 +84,48 @@ def db_pd(sql, params):
     try:
         if type(params) is list:
             con = connection()
+
         elif type(params) is tuple or params is None or not params:
             con = engine()
         else:
             raise Exception("invalid params" + str(type(params)))
         res["data"] = pd.read_sql(sql=sql, con=con, params=params)
         res["status"] = "ok"
+
+    except Exception as e:
+        res["error"] = str(e)
+    return res
+
+
+def pg_exec(sql, params):
+    """
+    postgress用のクエリ実行関数
+    """
+    res = {"status": "error", "data": "", "error": ""}
+    con = None
+    try:
+        print(params, flush=True)
+        print(type(params), flush=True)
+        if type(params) is list:
+            con = connection()
+            cursor = con.cursor()
+        elif type(params) is tuple or params is None or not params:
+            con = engine()
+            cursor = con.connect()
+        else:
+            raise Exception("invalid params" + str(type(params)))
+        if isinstance(con, mysql.connector.connection.MySQLConnection) or isinstance(
+            con, psycopg2.extensions.connection
+        ):
+            cursor.execute(sql, params)
+            con.commit()
+            res["data"] = "noresult"
+            res["status"] = "ok"
+        else:  # SQLAlchemyの場合
+            with con.connect() as conn:
+                conn.execute(sql, params)
+            res["data"] = "noresult"
+            res["status"] = "ok"
     except Exception as e:
         res["error"] = str(e)
     return res

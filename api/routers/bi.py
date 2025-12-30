@@ -33,6 +33,8 @@ async def execute(data: ExeData):
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
     logging.info(result)
     if (result["status"] == "ok") or (result["status"] == "fallback"):
+        if result["data"] == "noresult":
+            return result
         df = result["data"].replace([np.inf, -np.inf], np.nan).fillna(0)
         result["data"] = df.to_dict(orient="records")
     else:
