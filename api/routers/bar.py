@@ -30,6 +30,13 @@ class HealthCheckRequest(BaseModel):
     date: str
 
 
+class ShiftAddRequest(BaseModel):
+    date: str
+    user_serial: str
+    start_datetime: str
+    end_datetime: str
+
+
 class HealthCheck(BaseModel):
     attr_1: bool
     attr_2: bool
@@ -183,6 +190,75 @@ async def set_health_check(
                 request.healthCheck.attr_11,
             ],
         )
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/get_shift")
+async def get_shift(
+    request: HealthCheckRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": {}, "error": "error"}
+    try:
+        if current_user is None:
+            raise Exception("token expired")
+        result = await run_in_threadpool(
+            func.db_pd,
+            """select shift.date as date,shift.start_datetime as start_datetime,shift.end_datetime as end_datetime,user.first_name as first_name from public.shift_table as shift join bar_users as user on shift.user_serial=user.serial where shift.del_flg=false and user.del_flg=false and user.quit_date is null""",
+            (),
+        )
+        result["data"] = result["data"].to_dict(orient="records")
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/set_shift")
+async def set_shiftk(
+    request: ShiftAddRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": "", "error": "error"}
+
+    try:
+        if current_user is None:
+            raise Exception("token expired")
+        result = await run_in_threadpool(
+            func.pg_exec,
+            """insert into public.shit_table(date,user_serial,start_datetime,end_datetime,reg_user_serial)values(%s,%s,%s,%s,%s)""",
+            [
+                request.date,
+                request.user_serial,
+                request.start_datetime,
+                request.end_datetime,
+                current_user["sub"],
+            ],
+        )
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/get_available")
+async def get_available(
+    request: HealthCheckRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": {}, "error": "error"}
+    try:
+        if current_user is None:
+            raise Exception("token expired")
+        result = await run_in_threadpool(
+            func.db_pd,
+            """select serial,first_name from bar_users where del_flg=false and quit_date is null""",
+            (),
+        )
+        result["data"] = result["data"].to_dict(orient="records")
     except Exception as e:
         result["status"] = "ng"
         result["error"] = str(e)
