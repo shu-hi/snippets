@@ -36,10 +36,15 @@ class NewShift(BaseModel):
     selected_serial: str
     start_datetime: str
     end_datetime: str
+    serial: str
 
 
 class ShiftAddRequest(BaseModel):
     newShift: NewShift
+
+
+class ShiftDelRequest(BaseModel):
+    serial: int
 
 
 class HealthCheck(BaseModel):
@@ -212,7 +217,7 @@ async def get_shift(
             raise Exception("token expired")
         result = await run_in_threadpool(
             func.db_pd,
-            """select "shift"."date" as "date",shift.start_datetime as start_datetime,shift.end_datetime as end_datetime,t_user.first_name as first_name from public.shift_table as shift join bar_users as t_user on shift.user_serial=t_user.serial where shift.del_flg=false and t_user.del_flg=false and t_user.quit_date is null""",
+            """select "shift"."date" as "date","shift"."serial" as "serial",shift.start_datetime as start_datetime,shift.end_datetime as end_datetime,t_user.first_name as first_name from public.shift_table as shift join bar_users as t_user on shift.user_serial=t_user.serial where shift.del_flg=false and t_user.del_flg=false and t_user.quit_date is null""",
             (),
         )
         if result["status"] == "ok":
@@ -242,6 +247,30 @@ async def set_shift(
                 request.newShift.date + " " + request.newShift.start_datetime,
                 request.newShift.date + " " + request.newShift.end_datetime,
                 current_user["sub"],
+            ],
+        )
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/del_shift")
+async def del_shift(
+    request: ShiftDelRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": "", "error": "error"}
+
+    try:
+        if current_user is None:
+            raise Exception("token expired")
+        result = await run_in_threadpool(
+            func.pg_exec,
+            """update public.shift_table set del_flg=true,reg_user_serial=%s where serial=%s""",
+            [
+                current_user["sub"],
+                request.serial,
             ],
         )
     except Exception as e:
