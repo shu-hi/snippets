@@ -30,11 +30,16 @@ class HealthCheckRequest(BaseModel):
     date: str
 
 
-class ShiftAddRequest(BaseModel):
+class NewShift(BaseModel):
     date: str
-    user_serial: str
+    first_name: str
+    selected_serial: str
     start_datetime: str
     end_datetime: str
+
+
+class ShiftAddRequest(BaseModel):
+    newShift: NewShift
 
 
 class HealthCheck(BaseModel):
@@ -207,10 +212,11 @@ async def get_shift(
             raise Exception("token expired")
         result = await run_in_threadpool(
             func.db_pd,
-            """select shift.date as date,shift.start_datetime as start_datetime,shift.end_datetime as end_datetime,user.first_name as first_name from public.shift_table as shift join bar_users as user on shift.user_serial=user.serial where shift.del_flg=false and user.del_flg=false and user.quit_date is null""",
+            """select "shift"."date" as "date",shift.start_datetime as start_datetime,shift.end_datetime as end_datetime,t_user.first_name as first_name from public.shift_table as shift join bar_users as t_user on shift.user_serial=t_user.serial where shift.del_flg=false and t_user.del_flg=false and t_user.quit_date is null""",
             (),
         )
-        result["data"] = result["data"].to_dict(orient="records")
+        if result["status"] == "ok":
+            result["data"] = result["data"].to_dict(orient="records")
     except Exception as e:
         result["status"] = "ng"
         result["error"] = str(e)
@@ -219,7 +225,7 @@ async def get_shift(
 
 
 @router.post("/api/bar/set_shift")
-async def set_shiftk(
+async def set_shift(
     request: ShiftAddRequest, current_user: dict = Depends(get_current_user)
 ):
     result = {"status": "ng", "data": "", "error": "error"}
@@ -229,12 +235,12 @@ async def set_shiftk(
             raise Exception("token expired")
         result = await run_in_threadpool(
             func.pg_exec,
-            """insert into public.shit_table(date,user_serial,start_datetime,end_datetime,reg_user_serial)values(%s,%s,%s,%s,%s)""",
+            """insert into public.shift_table(date,user_serial,start_datetime,end_datetime,reg_user_serial)values(%s,%s,%s,%s,%s)""",
             [
-                request.date,
-                request.user_serial,
-                request.start_datetime,
-                request.end_datetime,
+                request.newShift.date,
+                request.newShift.selected_serial,
+                request.newShift.date + " " + request.newShift.start_datetime,
+                request.newShift.date + " " + request.newShift.end_datetime,
                 current_user["sub"],
             ],
         )
