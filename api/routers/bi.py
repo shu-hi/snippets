@@ -30,6 +30,7 @@ class DidData(BaseModel):
 
 @router.post("/api/execute")
 async def execute(data: ExeData):
+    return "temporary disaled for bar"
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
     logging.info(result)
     if (result["status"] == "ok") or (result["status"] == "fallback"):
@@ -44,6 +45,7 @@ async def execute(data: ExeData):
 
 @router.post("/api/head")
 async def head(data: ExeData):
+    return "temporary disaled for bar"
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
 
     if result["status"] == "ok" or result["status"] == "falback":

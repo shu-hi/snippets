@@ -30,6 +30,10 @@ class HealthCheckRequest(BaseModel):
     date: str
 
 
+class ApproachsearchRequest(BaseModel):
+    query: str
+
+
 class NewShift(BaseModel):
     date: str
     first_name: str
@@ -78,6 +82,17 @@ class HealthCheckAddRequest(BaseModel):
 class FridgeTempAddRequest(BaseModel):
     date: str
     fridgeCheck: FridgeCheck
+
+
+class AddApproach(BaseModel):
+    co_name: str
+    approach_media: str
+    comment: str
+
+
+class ApproachAddRequest(BaseModel):
+    date: str
+    approach: AddApproach
 
 
 # Function to create JWT token
@@ -135,6 +150,7 @@ async def login(request: LoginRequest):
             result["data"] = {
                 "access_token": access_token,
                 "job_class": user["job_class"],
+                "first_name": user["first_name"],
             }
             result["status"] = "ok"
         else:
@@ -367,6 +383,52 @@ async def set_fridge_temp(
                 request.fridgeCheck.fridge_4,
                 request.fridgeCheck.fridge_5,
                 request.fridgeCheck.body_temp,
+            ],
+        )
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/approach_search")
+async def approach_search(
+    request: ApproachsearchRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": {}, "error": "error"}
+    try:
+        result = await run_in_threadpool(
+            func.db_pd,
+            "select aplist.co_name as co_name,aplist.date as date,aplist.approach_media as approach_media,aplist.comment as comment,busers.first_name as first_name from public.approach_list as aplist join public.bar_users as busers on aplist.user_serial=busers.serial where aplist.co_name ILIKE %s and aplist.del_flg=false",
+            ("%" + request.query + "%",),
+        )
+        result["data"] = result["data"].to_dict(orient="records")
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/set_approach")
+async def set_approach(
+    request: ApproachAddRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": "", "error": "error"}
+
+    try:
+        if current_user is None:
+            raise Exception("token expired")
+        result = await run_in_threadpool(
+            func.pg_exec,
+            """insert into public.approach_list(date,user_serial,co_name,approach_media,comment)values(%s,%s,%s,%s,%s)""",
+            [
+                request.date,
+                current_user["sub"],
+                request.approach.co_name,
+                request.approach.approach_media,
+                request.approach.comment,
             ],
         )
     except Exception as e:
