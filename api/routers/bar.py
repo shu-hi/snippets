@@ -61,9 +61,23 @@ class HealthCheck(BaseModel):
     attr_11: bool
 
 
+class FridgeCheck(BaseModel):
+    fridge_1: float
+    fridge_2: float
+    fridge_3: float
+    fridge_4: float
+    fridge_5: float
+    body_temp: float
+
+
 class HealthCheckAddRequest(BaseModel):
     date: str
     healthCheck: HealthCheck
+
+
+class FridgeTempAddRequest(BaseModel):
+    date: str
+    fridgeCheck: FridgeCheck
 
 
 # Function to create JWT token
@@ -294,6 +308,67 @@ async def get_available(
             (),
         )
         result["data"] = result["data"].to_dict(orient="records")
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/get_fridge_check")
+async def get_fridge_check(
+    request: HealthCheckRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": {}, "error": "error"}
+    try:
+        result = await run_in_threadpool(
+            func.db_pd,
+            "select * from public.fridge_temp where date=%s and del_flg=false",
+            (request.date,),
+        )
+        result["data"] = result["data"].to_dict(orient="records")
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/set_fridge_temp")
+async def set_fridge_temp(
+    request: FridgeTempAddRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": "", "error": "error"}
+
+    try:
+        if current_user is None:
+            raise Exception("token expired")
+        result = await run_in_threadpool(
+            func.pg_exec,
+            """insert into public.fridge_temp
+            (date,reg_user_serial,fridge_1,fridge_2,fridge_3,fridge_4,fridge_5,body_temp)
+            values
+            (%s,%s,%s,%s,%s,%s,%s,%s)
+            on conflict(date) 
+            do update set 
+            reg_user_serial=excluded.reg_user_serial,
+            fridge_1=excluded.fridge_1,
+            fridge_2=excluded.fridge_2,
+            fridge_3=excluded.fridge_3,
+            fridge_4=excluded.fridge_4,
+            fridge_5=excluded.fridge_5,
+            body_temp=excluded.body_temp""",
+            [
+                request.date,
+                current_user["sub"],
+                request.fridgeCheck.fridge_1,
+                request.fridgeCheck.fridge_2,
+                request.fridgeCheck.fridge_3,
+                request.fridgeCheck.fridge_4,
+                request.fridgeCheck.fridge_5,
+                request.fridgeCheck.body_temp,
+            ],
+        )
     except Exception as e:
         result["status"] = "ng"
         result["error"] = str(e)
