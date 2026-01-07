@@ -173,7 +173,8 @@ async def bar_test():
             "select last_name from public.bar_users where serial=1 and del_flg=false",
             (),
         )
-        result["data"] = result["data"].to_dict(orient="records")
+        if type(result["data"]) is not str:
+            result["data"] = result["data"].to_dict(orient="records")
     except Exception as e:
         result["status"] = "ng"
         result["error"] = str(e)
