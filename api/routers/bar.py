@@ -261,11 +261,11 @@ async def get_shift(
             raise Exception("token expired")
         result = await run_in_threadpool(
             func.db_pd,
-            """select "shift"."date" as "date","shift"."serial" as "serial",shift.start_datetime as start_datetime,shift.end_datetime as end_datetime,t_user.first_name as first_name from public.shift_table as shift join bar_users as t_user on shift.user_serial=t_user.serial where shift.del_flg=false and t_user.del_flg=false and t_user.quit_date is null""",
+            """select "shift"."date" as "date","shift"."serial" as "serial",shift.start_datetime as start_datetime,shift.end_datetime as end_datetime,t_user.first_name as first_name from public.shift_table as shift join bar_users as t_user on shift.user_serial=t_user.serial where shift.del_flg=false and t_user.del_flg=false and t_user.quit_date is null AND shift.date >= CURRENT_DATE - INTERVAL '30 days'""",
             (),
         )
         if result["status"] == "ok":
-            result["data"] = result["data"].to_dict(orient="records")
+            result["data"] = result["data"].to_dict("records")
     except Exception as e:
         result["status"] = "ng"
         result["error"] = str(e)
