@@ -164,7 +164,7 @@ async def login(request: LoginRequest):
     return result
 
 
-@router.get("/api/bar/test")
+@router.head("/api/bar/test")
 async def bar_test():
     result = {"status": "ng", "data": {}, "error": "error"}
     try:
