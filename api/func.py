@@ -369,6 +369,7 @@ def get_envs():
     HF_API_KEY = os.getenv("HF_API_KEY")
     ESTAT_API_KEY = os.getenv("ESTAT_API_KEY")
     REAL_ESTATE_API = os.getenv("REAL_ESTATE_API")
+    TOKEN_GENERATE_KEY = os.getenv("TOKEN_GENERATE_KEY")
     return {
         "cs_api_key": CS_API_KEY,
         "cx": CX,
@@ -376,4 +377,5 @@ def get_envs():
         "hf": HF_API_KEY,
         "estat": ESTAT_API_KEY,
         "estate": REAL_ESTATE_API,
+        "token_generate_key": TOKEN_GENERATE_KEY,
     }

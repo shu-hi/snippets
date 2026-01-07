@@ -14,8 +14,9 @@ router = APIRouter()
 # OAuth2 password bearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
+envs = func.get_envs()
 # Secret key to encode/decode JWT (use a secure key in production)
-SECRET_KEY = "mysecretkey"  # Replace this with a more secure secret in production
+SECRET_KEY = envs["token_generate_key"]
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 180  # Token expiry time
 
@@ -164,8 +165,20 @@ async def login(request: LoginRequest):
 
 
 @router.get("/api/bar/test")
-async def protected_route(current_user: dict = Depends(get_current_user)):
-    return {"msg": "You have access!", "user": current_user}
+async def bar_test():
+    result = {"status": "ng", "data": {}, "error": "error"}
+    try:
+        result = await run_in_threadpool(
+            func.db_pd,
+            "select last_name from public.bar_users where serial=1 and del_flg=false",
+            (),
+        )
+        result["data"] = result["data"].to_dict(orient="records")
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
 
 
 @router.post("/api/bar/get_health_check")
