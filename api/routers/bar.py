@@ -96,6 +96,19 @@ class ApproachAddRequest(BaseModel):
     approach: AddApproach
 
 
+class AddUser(BaseModel):
+    first_name: str
+    last_name: str
+    hired_date: str
+    job_class: str
+    user_id: str
+    user_pass: str
+
+
+class AddUserRequest(BaseModel):
+    addUser: AddUser
+
+
 # Function to create JWT token
 def create_access_token(
     data: dict,
@@ -443,6 +456,34 @@ async def set_approach(
                 request.approach.co_name,
                 request.approach.approach_media,
                 request.approach.comment,
+            ],
+        )
+    except Exception as e:
+        result["status"] = "ng"
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/api/bar/set_user")
+async def set_user(
+    request: AddUserRequest, current_user: dict = Depends(get_current_user)
+):
+    result = {"status": "ng", "data": "", "error": "error"}
+
+    try:
+        if current_user is None:
+            raise Exception("token expired")
+        result = await run_in_threadpool(
+            func.pg_exec,
+            """insert into public.bar_users(first_name,last_name,hire_date,job_class,user_id,user_pass) values(%s,%s,%s,%s,%s,%s)""",
+            [
+                request.addUser.first_name,
+                request.addUser.last_name,
+                request.addUser.hired_date,
+                request.addUser.job_class,
+                request.addUser.user_id,
+                request.addUser.user_pass,
             ],
         )
     except Exception as e:
