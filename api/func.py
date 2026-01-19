@@ -339,13 +339,18 @@ def visualize_did(model):
     return buffer
 
 
-def del_outlier(df, column):
+def shrink_outlier(df, column, z=2):
     """
-    外れ値を除いたものを返す
-    @params df dataframe
-    @params column str
+    外れ値を削除せず、±zσの範囲に丸める
     """
-    return df[np.abs((df[column] - df[column].mean()) / (df[column].std())) < 2]
+    mean = df[column].mean()
+    std = df[column].std()
+
+    lower = mean - z * std
+    upper = mean + z * std
+
+    df[column] = df[column].clip(lower, upper)
+    return df
 
 
 def get_estimated_per_pref(pref_name):

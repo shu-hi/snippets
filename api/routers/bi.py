@@ -6,6 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from fastapi.responses import StreamingResponse
 import io
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
 import statsmodels.formula.api as smf
 import numpy as np
 import base64
@@ -30,7 +32,7 @@ class DidData(BaseModel):
 
 @router.post("/api/execute")
 async def execute(data: ExeData):
-    return "temporary disaled for bar"
+    # return "temporary disaled for bar"
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
     logging.info(result)
     if (result["status"] == "ok") or (result["status"] == "fallback"):
@@ -45,7 +47,7 @@ async def execute(data: ExeData):
 
 @router.post("/api/head")
 async def head(data: ExeData):
-    return "temporary disaled for bar"
+    # return "temporary disaled for bar"
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
 
     if result["status"] == "ok" or result["status"] == "falback":
@@ -105,7 +107,7 @@ async def hist(data: ExeData):
                 ax.set_title(f"Value counts of {col}")
             else:
                 if df[col].nunique() > 2 and np.issubdtype(df[col].dtype, np.number):
-                    df = func.del_outlier(df, col)
+                    df = func.shrink_outlier(df, col)
                 an, bins, patches = ax.hist(df[col].dropna(), bins=20, alpha=0.7)
                 # ビンの境界をx軸上にテキストで表示
                 for boundary in bins:
@@ -136,7 +138,7 @@ async def did(data: DidData):
     if result["status"] == "ok" or result["status"] == "falback":
         df = result["data"]
         if data.del_outlier:
-            df = func.del_outlier(df, "target")
+            df = func.shrink_outlier(df, "target")
         model = smf.ols("target ~ treated * C(period_flag)", data=df).fit()
         summary_df = pd.DataFrame(
             {
@@ -165,7 +167,7 @@ async def lifelines(data: ExeData):
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
     if result["status"] == "ok" or result["status"] == "falback":
         df = result["data"]
-        df = func.del_outlier(df, "duration")
+        df = func.shrink_outlier(df, "duration")
         cph = CoxPHFitter()
         cph.fit(df, duration_col="duration", event_col="event")
         cph.print_summary()
@@ -184,7 +186,7 @@ async def Linreg(data: ExeData):
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
     if result["status"] == "ok" or result["status"] == "falback":
         df = result["data"]
-        df = func.del_outlier(df, "target")
+        df = func.shrink_outlier(df, "target")
         df.dropna(inplace=True)
         df.index = np.arange(len(df.index))
         formula = "target ~ " + " + ".join(
@@ -220,4 +222,100 @@ async def Linreg(data: ExeData):
             "summary": summary_df.to_dict(orient="records"),
             "plot": img_base64,
         }
+    return result
+
+
+@router.post("/api/target_hist")
+async def target_hist(data: ExeData):
+    result = await run_in_threadpool(func.db_pd, data.sql, data.params)
+    if result["status"] == "ok" or result["status"] == "falback":
+        df = result["data"]
+
+        categories = df["category"].unique()
+        bins = np.histogram_bin_edges(df["target"], bins=20)
+        plt.figure(figsize=(8, 5))
+
+        for cat in categories:
+            values = df[df["category"] == cat]["target"]
+            plt.hist(
+                values,
+                bins=bins,
+                alpha=0.5,  # 重なりを見やすく
+                # density=True,
+                label=cat,
+            )
+
+        plt.xlabel("target")
+        plt.ylabel("count")
+        plt.title("Histogram of target by category")
+        plt.legend()
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+
+        return StreamingResponse(buffer, media_type="image/png")
+
+
+@router.post("/api/RFreg")
+async def RFreg(data: ExeData):
+    result = await run_in_threadpool(func.db_pd, data.sql, data.params)
+
+    if result["status"] in ["ok", "falback"]:
+        df = result["data"]
+
+        # 外れ値処理
+        df = func.shrink_outlier(df, "target")
+        df.dropna(inplace=True)
+        df.index = np.arange(len(df.index))
+        y = df["target"]
+        X = df.drop(columns=["target"])
+
+        model = RandomForestRegressor(
+            n_estimators=300,
+            max_depth=None,
+            min_samples_leaf=5,
+            random_state=42,
+            n_jobs=-1,
+        )
+
+        model.fit(X, y)
+
+        preds = model.predict(X)
+        df["predicted"] = preds
+        df["residual"] = y - preds
+
+        # ===== 精度指標 =====
+        metrics = {
+            "r2": r2_score(y, preds),
+            "rmse": root_mean_squared_error(y, preds),
+            "mae": mean_absolute_error(y, preds),
+        }
+        # =========
+        # Feature Importance
+        # =========
+        summary_df = pd.DataFrame(
+            {"Variable": X.columns, "Importance": model.feature_importances_}
+        ).sort_values("Importance", ascending=False)
+
+        plt.figure(figsize=(20, 10))
+        plt.plot(df.index, df["target"], label="Actual", marker="o")
+        plt.plot(
+            df.index, df["predicted"], label="Predicted (RandomForest)", linestyle="--"
+        )
+        plt.legend()
+
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
+
+        img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+        result["data"] = {
+            "feature_importance": summary_df.to_dict(orient="records"),
+            "metrics": metrics,
+            "plot": img_base64,
+        }
+
     return result
