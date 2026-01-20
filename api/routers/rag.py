@@ -195,7 +195,7 @@ async def rag(query: str):
             messages=[
                 {
                     "role": "user",
-                    "content": f"{query}に対して{ragdoc}をもとに答えてください",
+                    "content": f"{query}に対して参考情報をもとに答えてください{ragdoc}",
                 }
             ],
             stream=True,

@@ -229,13 +229,14 @@ def get_landprice(x: float, y: float, zoom_level: int):
         "z": zoom_level,
         "x": tile[1],
         "y": tile[0],
-        "year": this_year,
+        "year": 2025,
     }
     response = requests.get(
         url, headers={"Ocp-Apim-Subscription-Key": ESTATE}, params=params
     )
     user_data = response.json()
     p_list = []
+    print(user_data)
     for feature in user_data["features"]:
         tmp_list = feature["properties"].copy()
         tmp_list["x"] = feature["geometry"]["coordinates"][0]

@@ -152,24 +152,25 @@ async def login(request: LoginRequest):
             "select * from public.bar_users where quit_date is null and user_id=%s and user_pass=%s and del_flg=false",
             (id, password),
         )
-        result["data"] = result["data"].to_dict(orient="records")
+        if result["status"] == "ok":
+            result["data"] = result["data"].to_dict(orient="records")
 
-        # If user exists and credentials are correct
-        if len(result["data"]) == 1:
-            user = result["data"][0]  # Assuming the user data is returned here
-            # Create JWT access token
-            access_token = create_access_token(
-                data={"sub": str(user["serial"])}
-            )  # subは文字列じゃないと、decodeの時エラーが出る
-            result["data"] = {
-                "access_token": access_token,
-                "job_class": user["job_class"],
-                "first_name": user["first_name"],
-            }
-            result["status"] = "ok"
-        else:
-            result["status"] = "ng"
-            result["error"] = "Invalid credentials"
+            # If user exists and credentials are correct
+            if len(result["data"]) == 1:
+                user = result["data"][0]  # Assuming the user data is returned here
+                # Create JWT access token
+                access_token = create_access_token(
+                    data={"sub": str(user["serial"])}
+                )  # subは文字列じゃないと、decodeの時エラーが出る
+                result["data"] = {
+                    "access_token": access_token,
+                    "job_class": user["job_class"],
+                    "first_name": user["first_name"],
+                }
+                result["status"] = "ok"
+            else:
+                result["status"] = "ng"
+                result["error"] = "Invalid credentials"
     except Exception as e:
         result["status"] = "ng"
         result["error"] = str(e)
