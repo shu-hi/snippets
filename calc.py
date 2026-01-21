@@ -173,29 +173,17 @@ print(df.quantile(q=0.75) - df.quantile(q=0.25))
 
 # 次の課題（レベル1）
 # 問題A
-
 # あるクラス30人のテスト結果：
-
 # 平均：62
-
 # 標準偏差：10
-
 # 母平均50、母標準偏差10と仮定する。
-
 # この問題で使うべき検定は？
-
 # 帰無仮説・対立仮説を書け
-
 # 検定統計量を書け（数式 or Python）
-
 # 何が分かれば「優秀」と言えるか？
-
 # 問題B（Python寄り）
-
 # 次のコードの統計的に危険な点を指摘してください。
-
 # import numpy as np
-
 # data = np.random.normal(50, 10, 5)
 # if np.mean(data) > 55:
 #     print("有意に高い")
@@ -448,7 +436,9 @@ beta_A += fail_A
 alpha_B += success_B
 beta_B += fail_B
 
-posterior_A = s_s_beta(alpha_A, beta_A)  # 事後分布からベータ分布で分布を作る
+posterior_A = s_s_beta(
+    alpha_A, beta_A
+)  # 事後分布からベータ分布で分布を作る　beta(成功確率、失敗確率)　1,1だけは特別に一様分布
 posterior_B = s_s_beta(alpha_B, beta_B)
 
 samples_A = posterior_A.rvs(100000)  # 作った分布からサンプリング
@@ -469,4 +459,4 @@ plt.legend()
 plt.title("A群とB群の事後分布")
 plt.xlabel("CVR")
 plt.ylabel("確率密度")
-plt.savefig("basian.png")
+plt.savefig("baysian.png")
