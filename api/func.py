@@ -45,7 +45,9 @@ def engine():
     else:
         db_port = os.getenv("DB_PORT", "3306")
         url = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}?connect_timeout=3"
-    return create_engine(url, pool_pre_ping=True)
+    return create_engine(
+        url, pool_size=5, max_overflow=0, pool_recycle=1800, pool_pre_ping=True
+    )
 
 
 def db_connect(sql, params):
