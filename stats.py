@@ -15,7 +15,8 @@
 # ベイジアンA/Bテスト
 # ベイジアンモデル比較
 # ベイジアン順序検定
-
+# TODO var model
+# TODO time series
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt

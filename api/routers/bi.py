@@ -36,7 +36,7 @@ async def execute(data: ExeData):
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
     logging.info(result)
     if (result["status"] == "ok") or (result["status"] == "fallback"):
-        if result["data"] == "noresult":
+        if isinstance(result["data"], str):
             return result
         df = result["data"].replace([np.inf, -np.inf], np.nan).fillna(0)
         result["data"] = df.to_dict(orient="records")
@@ -122,7 +122,7 @@ async def hist(data: ExeData):
                         color="gray",
                     )
                 ax.set_title(f"{col}")
-        plt.tight_layout()
+        # plt.tight_layout()
         plt.legend()
         buffer = io.BytesIO()
         plt.savefig(buffer, format="png")
@@ -167,7 +167,9 @@ async def lifelines(data: ExeData):
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
     if result["status"] == "ok" or result["status"] == "falback":
         df = result["data"]
-        df = func.shrink_outlier(df, "duration")
+        for i, col in enumerate(df.columns):
+            if df[col].nunique() > 2 and np.issubdtype(df[col].dtype, np.number):
+                df = func.shrink_outlier(df, col)
         cph = CoxPHFitter()
         cph.fit(df, duration_col="duration", event_col="event")
         cph.print_summary()
@@ -186,7 +188,9 @@ async def Linreg(data: ExeData):
     result = await run_in_threadpool(func.db_pd, data.sql, data.params)
     if result["status"] == "ok" or result["status"] == "falback":
         df = result["data"]
-        df = func.shrink_outlier(df, "target")
+        for i, col in enumerate(df.columns):
+            if df[col].nunique() > 2 and np.issubdtype(df[col].dtype, np.number):
+                df = func.shrink_outlier(df, col)
         df.dropna(inplace=True)
         df.index = np.arange(len(df.index))
         formula = "target ~ " + " + ".join(

@@ -45,7 +45,7 @@ def engine():
     else:
         db_port = os.getenv("DB_PORT", "3306")
         url = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}?connect_timeout=3"
-    return create_engine(url)
+    return create_engine(url, pool_pre_ping=True)
 
 
 def db_connect(sql, params):
@@ -351,6 +351,13 @@ def shrink_outlier(df, column, z=2):
 
     df[column] = df[column].clip(lower, upper)
     return df
+
+
+def del_outlier(df, column):
+    """
+    外れ値を削除
+    """
+    return df[np.abs((df[column] - df[column].mean()) / (df[column].std())) < 2]
 
 
 def get_estimated_per_pref(pref_name):
