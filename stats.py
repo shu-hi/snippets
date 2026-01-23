@@ -17,6 +17,8 @@
 # ベイジアン順序検定
 # TODO var model
 # TODO time series
+# TODO ベイズ構造時系列モデル
+# TODO　ポアソン回帰
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
@@ -106,18 +108,11 @@ def paired_t(df_1_column, df_2_column, both_side=False):
     return standard_error, ci_low, ci_high, p_value
 
 
-# カイ二乗検定()
+# 2*2のカイ二乗検定()
 def chi_squared(df):
     observed = df.iloc[0].values
     expected = df.iloc[1].values
 
-    if (
-        observed.sum() < 99
-        or observed.sum() > 101
-        or expected.sum() < 99
-        or expected.sum() > 101
-    ):
-        raise Exception("chi_sq input must be percentge")
     chi_sq = ((observed - expected) ** 2 / expected).sum()
     dfree = len(observed) - 1
 
