@@ -23,14 +23,45 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 import yfinance as yf
+# 正規分布(平均,分散)に従うX(μx,ρx^2),Y(μy,ρy^2),それぞれ独立について
+# X+Yは正規分布X+Y(μx+μy,ρx^2+ρy^2)に従う
+# 一般化すると線形結合aX+bYは正規分布aX+bY(aμx+bμy,(a^2)(ρx^2)+(b^2)(ρy^2))
+# 正規分布(μ,ρ^2)に従うデータをn個ランダム抽出した標本は正規分布(nμ,nρ^2)に従う。
+# 線形結合の性質から平均＝正規分布(nμ,nρ^2)/nは正規分布(μx,(ρx^2)/n)に従う
+# ランダム抽出した標本数nの分散はカイ二乗分布(df=n-1)に従う
+
+# 分布が既知の任意の統計量は変数変換で確率密度関数にできるらしい……
+
+
+# 2*2のカイ二乗検定(=Z検定)二群の比率の検定
+# 同一の集団と仮定して共通の母比率から分散を求め、カイ二乗分布に従うか検定している
+# |t1|t2|
+# |s1|s2|
+def chi_squared(t1, t2, s1, s2):
+    if t1 * s1 * t2 * s1 <= 0:
+        raise Exception("all columns must be positive")
+    chi_sq = (
+        (t1 + t2 + s1 + s2)
+        * ((t1 * s2 - s1 * t2) ** 2)
+        / (t1 + t2)
+        / (s1 + s2)
+        / (t1 + s1)
+        / (t2 + s2)
+    )
+
+    p_value = stats.chi2.sf(chi_sq, 1)
+    return chi_sq, p_value
 
 
 # 1標本t検定
+# 正規分布からランダム抽出したものは正規分布に従う
+# 平均の差も正規分布に、推定された分散もカイ二乗分布に従う
+# 正規分布/(カイ二乗分布/自由度)**1/2はt分布に従うので検定できる
 def t_1(df_column, expected_mean, both_side=False):
     # p_value=t_1(df["target"],float,True)
     t_double = 2 if both_side else 1
 
-    standard_error = df_column.std(ddof=1) / np.sqrt(len(df_column))
+    standard_error = np.sqrt(df_column.var(ddof=1) / len(df_column))
     t = (df_column.mean() - expected_mean) / standard_error
     ci_low = df_column.mean() - stats.t.ppf(0.975, len(df_column) - 1) * standard_error
     ci_high = df_column.mean() + stats.t.ppf(0.975, len(df_column) - 1) * standard_error
@@ -48,7 +79,42 @@ def t_1(df_column, expected_mean, both_side=False):
     return standard_error, ci_low, ci_high, p_value
 
 
+# 対応ある2標本t検定
+# 正規分布に従うならその平均の差も正規分布に従う
+# 統合された(標本)標準誤差**1/2(=分散)はカイ二乗分布に従う
+# 正規分布/(カイ二乗分布/自由度)**1/2はt分布に従うので検定できる
+def paired_t(df_1_column, df_2_column, both_side=False):
+    t_double = 2 if both_side else 1
+    if len(df_1_column) != len(df_2_column):
+        raise Exception("different series length")
+
+    s2 = 0
+    for i in range(len(df_1_column)):
+        s2 += (df_1_column[i] - df_2_column[i]) ** 2 / (len(df_1_column) - 1)
+    # t値の計算
+    t = (df_1_column - df_2_column).mean() / np.sqrt(
+        (df_1_column - df_2_column) / len(df_1_column)
+    )
+    # 標準誤差の計算
+    standard_error = np.sqrt((df_1_column - df_2_column) / len(df_1_column))
+    # 信頼区間の計算
+    ci_low = (df_1_column - df_2_column).mean() - stats.t.ppf(
+        0.975, (len(df_1_column) - 1)
+    ) * standard_error
+    ci_high = (df_1_column - df_2_column).mean() + stats.t.ppf(
+        0.975, (len(df_1_column) - 1)
+    ) * standard_error
+    p_value = stats.t.sf(abs(t), (len(df_1_column) - 1)) * t_double
+
+    return standard_error, ci_low, ci_high, p_value
+
+
 # 2標本t検定(非等分散)welch
+# それぞれ正規分布に従うならその平均の差も正規分布に従う
+# 等分散であれば統合された(標本)標準誤差**1/2(=分散)はカイ二乗分布に従う
+# だが非等分散なので統合された(標本)標準誤差**1/2(=分散)を自由度で調整することでカイ二乗分布に近似
+# 正規分布/(カイ二乗分布/自由度)**1/2はt分布に従うので検定できる
+# なお非正規分布でも平均の差や分散は正規分布に収束するため使える
 def unpaired_t(df_1_column, df_2_column, both_side=False, name_1="", name_2=""):
     t_double = 2 if both_side else 1
     s2_1 = df_1_column.std(ddof=1) ** 2
@@ -82,43 +148,65 @@ def unpaired_t(df_1_column, df_2_column, both_side=False, name_1="", name_2=""):
     return standard_error, ci_low, ci_high, p_value
 
 
-def paired_t(df_1_column, df_2_column, both_side=False):
-    t_double = 2 if both_side else 1
-    if len(df_1_column) != len(df_2_column):
-        raise Exception("different series length")
+# グループごとの平方和の比の検定(分散分析)
+# 一つの特徴量の平均値について、3カテゴリ以上の間で差があるか検定する
+# category間の比/category内の比=F値は、F(グループ間の自由度,全体の自由度-グループ間の自由度)分布に従う
+# ||target|category|value_1|value_2|value_3...
+# |1|--s1-|-A--|...
+# |2|--s2-|-B--|...
+# |3|--s3-|-A--|...
+# |4|--s4-|-C--|...
+def annova(df, target, category):
+    categorys = df[category].unique()
+    N = len(df)
+    k = len(categorys)
+    grand_mean = df[target].mean()
 
-    s2 = 0
-    for i in range(len(df_1_column)):
-        s2 += (df_1_column[i] - df_2_column[i]) ** 2 / (len(df_1_column) - 1)
-    # t値の計算
-    t = (df_1_column - df_2_column).mean() / np.sqrt(
-        (df_1_column - df_2_column) / len(df_1_column)
-    )
-    # 標準誤差の計算
-    standard_error = np.sqrt((df_1_column - df_2_column) / len(df_1_column))
-    # 信頼区間の計算
-    ci_low = (df_1_column - df_2_column).mean() - stats.t.ppf(
-        0.975, (len(df_1_column) - 1)
-    ) * standard_error
-    ci_high = (df_1_column - df_2_column).mean() + stats.t.ppf(
-        0.975, (len(df_1_column) - 1)
-    ) * standard_error
-    p_value = stats.t.sf(abs(t), (len(df_1_column) - 1)) * t_double
+    ss_between = 0
+    ss_within = 0
 
-    return standard_error, ci_low, ci_high, p_value
+    for g in categorys:
+        x = df[df[category] == g][target]
+        ss_between += len(x) * (x.mean() - grand_mean) ** 2
+        ss_within += ((x - x.mean()) ** 2).sum()
+
+    ms_between = ss_between / (k - 1)
+    ms_within = ss_within / (N - k)
+
+    F = ms_between / ms_within
+    p_value = stats.f.sf(
+        F, k - 1, N - k * 1
+    )  # Nは全グループの自由度の和と考えると、グループ一種類毎に-1しなければならないため
+    return F, p_value
 
 
-# 2*2のカイ二乗検定()
-def chi_squared(df):
-    observed = df.iloc[0].values
-    expected = df.iloc[1].values
-
-    chi_sq = ((observed - expected) ** 2 / expected).sum()
-    dfree = len(observed) - 1
-
-    p_value = stats.chi2.sf(chi_sq, dfree)
-    return chi_sq, dfree, p_value
-
+#mann-whitneyのU検定
+#各標本についてもう一つの標本より順位の高い場合1を足していった和
+#U値は標準化すると正規分布に収束する
+#ノンパラだがそれぞれの分布の形が近しいことが条件
+#帰無仮説は一方がもう一方に勝つ勝率==0.5
+def mann_whitney_u(df,target,category):
+    categorys = df[category].unique()
+    if len(categorys) != 2:
+        raise ValueError("category must have exactly 2 groups")
+    df["u_index"] = stats.rankdata(df[target], method="average")
+    df_grouped=df.groupby(category)
+    n1=df_grouped.size()[0]
+    n2=df_grouped.size()[1]
+    R1=df_grouped['u_index'].sum()[0]
+    R2=df_grouped['u_index'].sum()[1]
+    u_value=min(n1*n2+(n1*(n1+1)/2)-R1,n1*n2+(n2*(n2+1)/2)-R2)
+    z_value=(u_value-(n1*n2/2)-0.5)/np.sqrt(n1*n2*(n1+n2+1)/12)
+    p_value=2*stats.norm.sf(abs(z_value))
+    plt.figure(figsize=(25, 15))
+    fig, ax = plt.subplots(figsize=(20, 12))
+    plt.scatter(np.linspace(0,0,n1),df.loc[df[category]==categorys[0]][target],c="red",label=f"{category}:{categorys[0]}")
+    plt.scatter(np.linspace(1,1,n2),df.loc[df[category]==categorys[1]][target],c="blue",label=f"{category}:{categorys[1]}")
+    plt.title(f"p_value:{p_value} z_value:{z_value}")
+    plt.legend()
+    plt.savefig("mann_whitney_u")
+    return u_value,z_value,p_value
+    
 
 def series_hist(series, ax, name):
     an, bins, patches = ax.hist(
@@ -153,12 +241,15 @@ def get_stock_history(symbol: str, start, end):
     return ticker.history(start=start, end=end)
 
 
-df = get_stock_history("^N225", "2023-01-01", "2024-01-01")
-df_all = get_stock_history("^N225", "2024-01-01", "2025-01-01")
-expected_mean = df_all["Close"].mean()
-standard_error, ci_low, ci_high, p_value = unpaired_t(
-    df["Close"], df_all["Close"], False, "under_covid", "post_covid"
-)
-plt.figure(figsize=(20, 10))
-plt.plot(df_all.index, df_all["Close"])
-plt.savefig("line.png")
+if __name__ == "__main__":
+    df = get_stock_history("^N225", "2023-01-01", "2024-01-01")
+    df_all = get_stock_history("^N225", "2024-01-01", "2025-01-01")
+    expected_mean = df_all["Close"].mean()
+    standard_error, ci_low, ci_high, p_value = unpaired_t(
+        df["Close"], df_all["Close"], False, "under_covid", "post_covid"
+    )
+    plt.figure(figsize=(20, 10))
+    plt.plot(df.index, df["Close"])
+    plt.savefig("line.png")
+    df["is_post_june"] = (df.index >= "2023-06-01").astype(int)
+    mann_whitney_u(df,"Close","is_post_june")
