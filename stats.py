@@ -180,33 +180,134 @@ def annova(df, target, category):
     return F, p_value
 
 
-#mann-whitneyのU検定
-#各標本についてもう一つの標本より順位の高い場合1を足していった和
-#U値は標準化すると正規分布に収束する
-#ノンパラだがそれぞれの分布の形が近しいことが条件
-#帰無仮説は一方がもう一方に勝つ勝率==0.5
-def mann_whitney_u(df,target,category):
+# mann-whitneyのU検定
+# 各標本についてもう一つの標本より順位の高い場合1を足していった和
+# =ベルヌーイ変数の和なのでU値は標準化すると正規分布に収束する
+# ノンパラだがそれぞれの分布の形が近しいことが条件
+# 帰無仮説は一方がもう一方に勝つ勝率==0.5
+def mann_whitney_u(df, target, category):
     categorys = df[category].unique()
     if len(categorys) != 2:
         raise ValueError("category must have exactly 2 groups")
     df["u_index"] = stats.rankdata(df[target], method="average")
-    df_grouped=df.groupby(category)
-    n1=df_grouped.size()[0]
-    n2=df_grouped.size()[1]
-    R1=df_grouped['u_index'].sum()[0]
-    R2=df_grouped['u_index'].sum()[1]
-    u_value=min(n1*n2+(n1*(n1+1)/2)-R1,n1*n2+(n2*(n2+1)/2)-R2)
-    z_value=(u_value-(n1*n2/2)-0.5)/np.sqrt(n1*n2*(n1+n2+1)/12)
-    p_value=2*stats.norm.sf(abs(z_value))
+    df_grouped = df.groupby(category)
+    n1 = df_grouped.size()[0]
+    n2 = df_grouped.size()[1]
+    R1 = df_grouped["u_index"].sum()[0]
+    R2 = df_grouped["u_index"].sum()[1]
+    u_value = min(
+        n1 * n2 + (n1 * (n1 + 1) / 2) - R1, n1 * n2 + (n2 * (n2 + 1) / 2) - R2
+    )
+    z_value = (u_value - (n1 * n2 / 2) - 0.5) / np.sqrt(n1 * n2 * (n1 + n2 + 1) / 12)
+    p_value = 2 * stats.norm.sf(abs(z_value))
     plt.figure(figsize=(25, 15))
     fig, ax = plt.subplots(figsize=(20, 12))
-    plt.scatter(np.linspace(0,0,n1),df.loc[df[category]==categorys[0]][target],c="red",label=f"{category}:{categorys[0]}")
-    plt.scatter(np.linspace(1,1,n2),df.loc[df[category]==categorys[1]][target],c="blue",label=f"{category}:{categorys[1]}")
+    plt.scatter(
+        np.linspace(0, 0, n1),
+        df.loc[df[category] == categorys[0]][target],
+        c="red",
+        label=f"{category}:{categorys[0]}",
+    )
+    plt.scatter(
+        np.linspace(1, 1, n2),
+        df.loc[df[category] == categorys[1]][target],
+        c="blue",
+        label=f"{category}:{categorys[1]}",
+    )
     plt.title(f"p_value:{p_value} z_value:{z_value}")
     plt.legend()
     plt.savefig("mann_whitney_u")
-    return u_value,z_value,p_value
-    
+    return u_value, z_value, p_value
+
+
+# brunner-munzel検定
+# 非等分散でも(分布の形が違っても)使える順位和検定(ノンパラ)
+# 順位和と順位の分散を使ったBM統計量(構造はwelch-tと一緒)が、t分布に従う
+def brunner_munzel(df, target, category):
+    categorys = df[category].unique()
+    if len(categorys) != 2:
+        raise ValueError("category must have exactly 2 groups")
+    df["u_index"] = stats.rankdata(df[target], method="average")
+    df_1 = df.loc[df[category] == categorys[0]].copy()
+    df_2 = df.loc[df[category] == categorys[1]].copy()
+    R1 = df_1["u_index"].sum()
+    R2 = df_2["u_index"].sum()
+    df_1["inner_index"] = stats.rankdata(df_1[target], method="average")
+    df_2["inner_index"] = stats.rankdata(df_2[target], method="average")
+    df_1["sigma"] = (
+        df_1["u_index"] - df_1["inner_index"] - R1 + (len(df_1) + 1) / 2
+    ) ** 2
+    df_2["sigma"] = (
+        df_2["u_index"] - df_2["inner_index"] - R2 + (len(df_2) + 1) / 2
+    ) ** 2
+    sigma1 = df_1["sigma"].sum() / (len(df_1) - 1)
+    sigma2 = df_2["sigma"].sum() / (len(df_2) - 1)
+    BM = (
+        len(df_1)
+        * len(df_2)
+        * (R1 - R2)
+        / (len(df))
+        / np.sqrt(len(df_1) * sigma1 + len(df_2) * sigma2)
+    )
+    dfree = ((len(df_1) * sigma1 + len(df_2) * sigma2) ** 2) / (
+        (((len(df_1) * sigma1) ** 2) / (len(df_1) - 1))
+        + (((len(df_2) * sigma2) ** 2) / (len(df_2) - 1))
+    )
+    p_value = stats.t.sf(abs(BM), dfree) * 2
+
+    plt.figure(figsize=(25, 15))
+    fig, ax = plt.subplots(figsize=(20, 12))
+    plt.scatter(
+        np.linspace(0, 0, len(df_1)),
+        df_1[target],
+        c="red",
+        label=f"{category}:{categorys[0]}",
+    )
+    plt.scatter(
+        np.linspace(1, 1, len(df_2)),
+        df_2[target],
+        c="blue",
+        label=f"{category}:{categorys[1]}",
+    )
+    plt.title(f"p_value:{p_value} bm_value:{BM}")
+    plt.legend()
+    plt.savefig("mann_whitney_u")
+    return BM, p_value
+
+
+def hist(df):
+    plt.figure(figsize=(20, 10))
+    n_cols = len(df.columns)
+    n_rows = (n_cols + 3) // 4  # 1行に4つ並べる
+    fig, axes = plt.subplots(n_rows, 3, figsize=(20, 5 * n_rows))
+    axes = axes.flatten()
+    for i, col in enumerate(df.columns):
+        ax = axes[i]
+        if df[col].dtype == "object":
+            counts = df[col].value_counts()
+            counts.plot(kind="bar", ax=ax, alpha=0.7)
+            ax.set_title(f"Value counts of {col}")
+        else:
+            # if df[col].nunique() > 2 and np.issubdtype(df[col].dtype, np.number):
+            #    df = func.shrink_outlier(df, col)
+            an, bins, patches = ax.hist(df[col].dropna(), bins=20, alpha=0.7)
+            # ビンの境界をx軸上にテキストで表示
+            for boundary in bins:
+                ax.text(
+                    boundary,
+                    -500,
+                    f"{boundary:.1f}",
+                    rotation=90,
+                    va="bottom",
+                    ha="center",
+                    fontsize=8,
+                    color="gray",
+                )
+            ax.set_title(f"{col}")
+    # plt.tight_layout()
+    plt.legend()
+    plt.savefig("hist")
+
 
 def series_hist(series, ax, name):
     an, bins, patches = ax.hist(
@@ -252,4 +353,4 @@ if __name__ == "__main__":
     plt.plot(df.index, df["Close"])
     plt.savefig("line.png")
     df["is_post_june"] = (df.index >= "2023-06-01").astype(int)
-    mann_whitney_u(df,"Close","is_post_june")
+    mann_whitney_u(df, "Close", "is_post_june")

@@ -214,6 +214,55 @@ def convert_pref(input):
 
 
 if __name__ == "__main__":
+    df = db_pd(
+        """SELECT
+    case when orders.suryou is null then 0 else orders.suryou end as suryou,
+    case when orders.kingaku is null then 0 else orders.kingaku end as kingaku,
+    out_id,out_coname
+FROM
+    dami2.seller_outlet
+LEFT JOIN(
+    SELECT
+        urite_id,
+        SUM(kingaku) AS kingaku,
+        SUM(suryou) AS suryou
+    FROM
+        dami2.order_dat
+    WHERE
+        order_time > '2025-01-01'
+    GROUP BY
+        urite_id
+) AS orders
+ON
+    orders.urite_id = seller_outlet.out_id where out_del_flg=0 and out_outkind=0""",
+        (),
+    )["data"]
+    # print(df)
+    fig, ax = plt.subplots(figsize=(25, 15))
+
+    # kingaku = df["kingaku"]
+    # z = (kingaku - kingaku.mean()) / kingaku.std(ddof=0)
+    # df = df[z.abs() < 2]
+
+    an, bins, patches = ax.hist(
+        np.log10(df.loc[df["kingaku"] > 0]["kingaku"].dropna()),
+        bins=20,
+        # density=True,
+        alpha=0.7,
+        label="order kingaku sum",
+    )
+
+    ymin, _ = ax.get_ylim()
+    for boundary in bins:
+        ax.text(
+            boundary, ymin, f"{boundary:.1f}", rotation=90, fontsize=8, color="gray"
+        )
+
+    ax.legend()
+    plt.savefig("outlet_without0.png", dpi=150, bbox_inches="tight")
+
+    print(df["kingaku"].max())
+if __name__ == "__main":
     df = pd.read_csv("/home/ubuntu/pandas-snippet/train.csv")
     print("read from csv\n")
     print(df)

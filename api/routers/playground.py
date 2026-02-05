@@ -1,90 +1,162 @@
 from fastapi import APIRouter
+import asyncio
+import httpx
 from pydantic import BaseModel
-import json
-import os
+from bs4 import BeautifulSoup
+
 
 router = APIRouter()
 
-FILE_PATH = "table_data.json"
+
+class PrefRequest(BaseModel):
+    data: list[int]
 
 
-class TableData(BaseModel):
-    name: str
-    columns: str
+@router.post("/api/get_jnet_21")
+async def get_jnet_21(req: PrefRequest):
+    tasks = [jnet_21(pref_code) for pref_code in req.data]
+    results = await asyncio.gather(*tasks)
+    print(results)
+    return {"status": "ok", "data": results}
 
 
-class DellData(BaseModel):
-    name: str
+async def jnet_21(pref_code: str):
+    url = (
+        "https://j-net21.smrj.go.jp/snavi/articles"
+        "?category%5B0%5D=2&order=DESC&perPage=100&page=1"
+        f"&prefecture%5B0%5D={pref_code}"
+    )
+
+    async with httpx.AsyncClient() as client:
+        res = await client.get(url)
+        html = res.text
+        soup = BeautifulSoup(html, "html.parser")
+
+        results = []
+        for div in soup.find_all("div", class_="title-meta"):
+            a = "https://j-net21.smrj.go.jp" + div.find("a").get("href")
+            if not a:
+                continue
+            res = await client.get(a)
+            html = res.text
+            title = div.get_text(strip=True)
+            content, link = extract_notice_text(html)
+
+            results.append({"title": title, "content": content, "link": link})
+
+        return results
 
 
-@router.post("/api/add_table")
-async def add_table(data: TableData):
-    # 1. 既存データを読み込む
-    if os.path.exists(FILE_PATH):
-        with open(FILE_PATH, "r", encoding="utf-8") as f:
-            try:
-                table_list = json.load(f)
-            except json.JSONDecodeError:
-                table_list = []
-    else:
-        table_list = []
+def extract_notice_text(html: str) -> str | None:
+    soup = BeautifulSoup(html, "html.parser")
 
-    # 2. name が既にあるかチェック
-    if any(item["name"] == data.name for item in table_list):
-        return {"status": "ng", "data": table_list}
-    max_serial = max([item["serial"] for item in table_list], default=0)
-    new_serial = max_serial + 1
+    # h3 の文字が「実施機関からのお知らせ」のものを探す
+    h3 = soup.find("h3", string="実施機関からのお知らせ")
+    if not h3:
+        return None
 
-    # 3. 新しいデータを追加
-    new_entry = {"name": data.name, "columns": data.columns, "serial": new_serial}
-    table_list.append(new_entry)
+    # h3 を含んでいる section を取得
+    section = h3.find_parent("section")
+    if not section:
+        return None
 
-    # 4. JSON に書き込み
-    with open(FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump(table_list, f, ensure_ascii=False, indent=2)
+    # section 内の p を取得（複数あっても連結）
+    paragraphs = section.find_all("p")
+    text = "\n".join(p.get_text(strip=True) for p in paragraphs)
 
-    return {"status": "ok", "data": table_list}
+    ul = soup.find("ul", class_="detailListLink")
+    a = ul.find("li").find("a").get("href")
 
-
-@router.get("/api/get_table")
-async def get_table():
-    # 1. 既存データを読み込む
-    if os.path.exists(FILE_PATH):
-        with open(FILE_PATH, "r", encoding="utf-8") as f:
-            try:
-                table_list = json.load(f)
-            except json.JSONDecodeError:
-                table_list = []
-    else:
-        table_list = []
-
-    return {"status": "ok", "data": table_list}
-
-
-@router.delete("/api/del_table")
-async def del_table(data: DellData):
-    # 1. 既存データを読み込む
-    if os.path.exists(FILE_PATH):
-        with open(FILE_PATH, "r", encoding="utf-8") as f:
-            try:
-                table_list = json.load(f)
-            except json.JSONDecodeError:
-                table_list = []
-    else:
-        table_list = []
-
-    new_table = [item for item in table_list if not (item["name"] == data.name)]
-
-    if len(new_table) == len(table_list):
-        # 削除対象が見つからなかった
-        return {
-            "status": "ng",
-            "message": "該当データが見つかりません",
-            "data": table_list,
-        }
-
-    # 3. ファイルに上書き保存
-    with open(FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump(new_table, f, ensure_ascii=False, indent=2)
-
-    return {"status": "ok", "data": new_table}
+    return text, a
+    # 1) スタートアップ向けの補助金（返済不要・審査あり）
+    # ■ 小規模事業者持続化補助金
+    # 経営計画に基づく販路開拓・業務効率化費用を補助。
+    # 個人事業主でも申請可能。従業員数や業種により補助上限・枠が複数あり。
+    # ■ ものづくり補助金（ものづくり・商業・サービス生産性向上促進補助金）
+    # 製品・サービス・設備投資、新技術導入などの費用を補助。
+    # 補助額は数十万〜数千万円規模と幅広い。
+    # ■ IT導入補助金
+    # ITツール導入（ソフト・クラウド・セキュリティ等）に対して補助。
+    # 個人事業主・フリーランスも対象となる場合あり。
+    # ■ 事業再構築補助金
+    # 既存ビジネスの構造転換・成長分野進出に要する費用を補助。
+    # 小〜中規模事業者が対象。
+    # ■ 自治体型創業・起業支援補助金
+    # 例：各都道府県・市が提供する創業助成金（初期費用・賃料・人件費等を支援）
+    # 東京都・大阪・福岡など独自制度あり。
+    # ■ 日本版SBIR（Small Business Innovation Research 制度）
+    # 概要：政府横断の研究開発支援制度で、各省庁が提示するテーマに合致する革新的技術・事業開発に対して補助金が出される。フェーズごとの支援（概念実証〜実用化）など複数段階あり、科学技術系スタートアップが対象。
+    # ■ NEDO/ディープテック・スタートアップ支援基金
+    # 概要：新エネルギー・産業技術総合開発機構（NEDO）による技術系スタートアップ向けの助成・支援プログラム（ディープテック、GXなど重点領域）。研究開発・社会実装支援に適用される場合あり。
+    # ■ 中小企業庁・創業支援等認定制度による創業型補助金
+    # 概要：創業5年未満など一定条件を満たすスタートアップ・小規模事業者向けに、①創業型持続化補助金（創業支援計画認定者向け）など国側支援枠が用意されることがある。
+    # 🏙️ 地方自治体・地域向けの補助金（都道府県・市区町村）
+    # ※自治体型創業支援補助金の例をさらに多数含みます（東京中小企業振興公社の創業助成金等も含まれています）。
+    # ■ 地方創生起業支援金（都道府県ごと）
+    # 内容：地域課題解決型の起業・スタートアップ支援として、事務所設置費用、人材育成、人件費、広告費などの一部を補助（例：最大200万円程度の制度あり）。
+    # ■ 県・市のスタートアップ・実証実験補助金
+    # 例：地域課題を解決するスタートアップ向けの実証実験費補助、地域産業創出支援、拠点化補助など。実施地域・予算は自治体によって多様。
+    # ■ 創業支援補助金（自治体独自型）
+    # 例：札幌市創業促進補助金、小樽市創業支援補助金、函館市創業バックアップなど、各地域で創業向け補助金が実施。
+    # 2) スタートアップ・事業主向けの助成金（条件満たせば原則受給可）
+    # ■ 人材開発支援助成金
+    # 従業員への研修・教育の実施費用や賃金の一部を助成。複数コースあり。
+    # ■ 早期再就職支援等助成金
+    # 中途採用拡大・UIJターン雇用などの施策実施による助成。
+    # ■ キャリアアップ助成金
+    # 非正規から正規雇用転換など、人材育成・雇用安定を支援。
+    # ■ 雇用調整助成金
+    # 経済的理由で事業縮小となった場合、雇用維持のための休業等の費用を助成。
+    # ■ 業務改善助成金
+    # 目的：事業場内最低賃金の引上げに伴う生産性向上のための設備投資・改善等に対して助成。
+    # *設備導入費用・人材育成費・コンサル費用などが対象になることもあり、中小事業者の成長施策として活用できる。
+    # ■ 働き方改革推進支援助成金
+    # 目的：長時間労働の削減や年次有給休暇促進、柔軟な働き方制度の整備など、労働環境整備を目的とした取組に対して助成。
+    # ＊中小企業・スタートアップでも申請可能なコースがあり、労務管理の強化・DX導入に役立つ費用も含まれる場合がある。
+    # ■ 人材確保等支援助成金
+    # 目的：雇用管理制度・テレワークなど新たな働き方や外国人労働者の就労環境整備に対して助成。
+    # *テレワーク導入の制度化・多言語就業環境整備など、雇用以外の環境整備にも対応するコースあり。
+    # 🏙️ 自治体・地域独自の助成金・支援制度（雇用以外/創業含む）
+    # 自治体は独自に助成金制度を設けており、スタートアップの創業・事業運営支援として利用できるケースがあります。※制度内容・金額・対象は自治体ごとに大きく異なります。
+    # ■ 創業・起業支援助成金（自治体型）
+    # 創業支援金／起業支援金：創業初期のオフィス賃料、設立費用、宣伝広告費などを対象とする助成金。※例として東京都・横浜市・札幌市等で独自に実施。
+    # ■ 事業継続・生活支援助成金（自治体・中小企業振興公社）
+    # 地域経済の安定化やインフレ影響対策として、光熱費負担緩和・価格高騰対策などの助成金を提供する自治体もあり、スタートアップの経費抑制に役立つ。
+    # ■ 環境・省エネ・SDGs関連助成金
+    # 一部自治体では環境配慮・省エネルギー設備導入などの助成を実施。スタートアップでも該当すれば活用可能。
+    # 3) 個人（創業者／個人事業主）向け手当・給付関連制度
+    # ■ 雇用保険の失業手当（基本手当）
+    # 失業時に一定期間支給される手当。雇用保険加入条件あり。
+    # ■ Hello Work の職業訓練手当
+    # 職業訓練受講中に一定の手当が支給される制度（条件あり）。
+    # ■ 求職者支援制度（職業訓練＋給付金）
+    # 雇用保険を受給できない人向け
+    # 職業訓練を受けながら
+    #  月10万円の給付金＋交通費
+    # フリーター・既卒・無職期間がある人も対象
+    #  就活中の人が一番使うべき制度の一つ
+    # ■ 住居確保給付金
+    # 離職・収入減少で家賃が払えない人向け
+    # 家賃相当額を自治体が直接家主へ支給
+    # 原則3か月（延長あり）
+    #  無職・内定前・転職活動中でも対象になるケースあり
+    # ■ 地方自治体の学生支援給付
+    # 家賃補助
+    # 奨学金返還支援
+    # ④ 妊娠・出産・子育て関連（個人給付）
+    # ⑤ 医療・障害・メンタル関連の給付
+    # ■ 自立支援医療制度
+    # 精神疾患・通院治療の医療費自己負担軽減
+    # 就活中・学生でも対象
+    # ■ 傷病手当金
+    # 病気やメンタル不調で働けない場合
+    # 条件次第で退職後も受給可能
+    # ■ 障害年金
+    # 身体・精神・発達障害含む
+    # 就労中・学生・無職でも対象になるケースあり
+    # 4) 地方自治体独自の補助金・支援
+    # 多くの自治体が独自の補助金・助成金制度を設けています。
+    # 例：
+    # 市町村の起業支援補助（事務所賃借料・設備費）
+    # 地方の購入支援補助（地元企業がスタートアップ商品を購入すると補助）
+    # ※ 自治体ごとに名称・内容・申請時期が異なるため、住んでいる/事業を行う自治体のHPやJ-Net21で最新一覧を確認することをおすすめします。
