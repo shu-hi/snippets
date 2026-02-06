@@ -5,7 +5,7 @@ WORKDIR /app
 # ① 変更頻度の低い requirements を先に処理
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
+RUN pip install --upgrade lifelines
 # ② 残りのファイル（models 除外済み）を一括コピー
 COPY ./api .
 
