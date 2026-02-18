@@ -275,6 +275,53 @@ def brunner_munzel(df, target, category):
     return BM, p_value
 
 
+# 単回帰
+# y=ax+b,(sn,tn)について残差はsigma(asn+b-tn)**2、これの最小化を目指す
+# 展開してa**2*sigma(sn)**2+2ab*sigma(sn)+n*b**2-2a*sigma(tn*sn)-2b*sigma(tn)+sigma(tn**2)
+# aについて微分を取って2a*sigma(sn**2)+2b*sigma(sn)-2*sigma(sn*tn)=0
+# bについて微分を取って2a*sigma(sn)+2nb-2*sigma(tn)=0
+# 連立するとa=(-sigma(sn)*sigma(tn)+n*sigma(tn*sn))/(n*sigma(sn**2)-(sigma(sn))**2)
+# b=-(a*sigma(sn)-sigma(tn))/n
+def simple_reg(df, target):
+    df_copy = df.copy()
+    if len(df.columns) != 2:
+        raise ValueError("simple reg is single parameter regression")
+    parameters = {}
+    plt.figure(figsize=(25, 15))
+    for column in df_copy.columns:
+        if column != target:
+            df_copy[column + "_sq"] = df_copy[column] ** 2
+            df_copy[column + "_mult"] = df_copy[column] * df_copy[target]
+            param = (
+                -df_copy[column].sum() * df_copy[target].sum()
+                + len(df_copy) * df_copy[column + "_mult"].sum()
+            ) / (
+                len(df_copy) * (df_copy[column + "_sq"].sum())
+                - (df_copy[column].sum()) ** 2
+            )
+            parameters[column] = {"param": param}
+            seg = (
+                -1
+                * (param * (df_copy[column].sum()) - df_copy[target].sum())
+                / len(df_copy)
+            )
+            plt.scatter(df_copy[column], df_copy[target], c="red")
+            plt.scatter(df_copy[column], (df_copy[column] * param) + seg, c="blue")
+    plt.savefig("simple_reg")
+
+
+# 重回帰
+# 実測値をベクトルY、説明変数を行列x、各係数をベクトルwとし、モデルをy=wx(y:vector,w:vector,x:vector matrix)として
+# sigma(Y-y)**2の最小化を目指す。
+# (Y-y)^T*(Y-y)=(Y-xw)^T*(Y-xw)=(Y^T-(xw)^T)*(Y-xw)=Y^T*Y-2Y^T*xw+w^T*x^T*w*xと変形してwについて微分し、0になるのは
+# w=(x^T*x)**-1*x^T*yのとき。
+# ただし(x^T*x)**-1が計算できないとき解が定まらない
+def multi_reg(df, target):
+    cols = [c for c in df.columns if c != target]
+    X_vector = np.hstack([np.ones((len(df), 1)), df[cols].to_numpy()])
+    beta = np.linalg.pinv(X_vector) @ df[target].to_numpy()
+
+
 def hist(df):
     plt.figure(figsize=(20, 10))
     n_cols = len(df.columns)
@@ -345,12 +392,13 @@ def get_stock_history(symbol: str, start, end):
 if __name__ == "__main__":
     df = get_stock_history("^N225", "2023-01-01", "2024-01-01")
     df_all = get_stock_history("^N225", "2024-01-01", "2025-01-01")
-    expected_mean = df_all["Close"].mean()
-    standard_error, ci_low, ci_high, p_value = unpaired_t(
-        df["Close"], df_all["Close"], False, "under_covid", "post_covid"
-    )
-    plt.figure(figsize=(20, 10))
-    plt.plot(df.index, df["Close"])
-    plt.savefig("line.png")
-    df["is_post_june"] = (df.index >= "2023-06-01").astype(int)
-    mann_whitney_u(df, "Close", "is_post_june")
+    simple_reg(df.loc[:, ["Close", "Open"]], "Close")
+    # expected_mean = df_all["Close"].mean()
+    # standard_error, ci_low, ci_high, p_value = unpaired_t(
+    #    df["Close"], df_all["Close"], False, "under_covid", "post_covid"
+    # )
+    # plt.figure(figsize=(20, 10))
+    # plt.plot(df.index, df["Close"])
+    # plt.savefig("line.png")
+    # df["is_post_june"] = (df.index >= "2023-06-01").astype(int)
+    # mann_whitney_u(df, "Close", "is_post_june")
