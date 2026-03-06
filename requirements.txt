@@ -19,3 +19,4 @@ jageocoder
 geopandas
 folium
 python-jose
+supabase
