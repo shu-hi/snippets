@@ -20,3 +20,4 @@ geopandas
 folium
 python-jose
 supabase
+duckdb

@@ -4,7 +4,7 @@ import os
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from routers import playground, bi, myfinance, search, rag, real_estate, bar
+from routers import playground, bi, myfinance, search, rag, real_estate, bar,stats
 
 load_dotenv()  # .envファイルの読み込み
 if os.getenv("ENV") != "DEV":
@@ -28,6 +28,7 @@ main.include_router(search.router)
 main.include_router(rag.router)
 main.include_router(real_estate.router)
 main.include_router(bar.router)
+main.include_router(stats.router)
 
 
 @main.get("/api/data")

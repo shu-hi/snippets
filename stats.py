@@ -19,10 +19,13 @@
 # TODO time series
 # TODO ベイズ構造時系列モデル
 # TODO　ポアソン回帰
+# TODO　uplift modeling
+#TODO 決定境界の可視化
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 import yfinance as yf
+import pandas as pd
 # 正規分布(平均,分散)に従うX(μx,ρx^2),Y(μy,ρy^2),それぞれ独立について
 # X+Yは正規分布X+Y(μx+μy,ρx^2+ρy^2)に従う
 # 一般化すると線形結合aX+bYは正規分布aX+bY(aμx+bμy,(a^2)(ρx^2)+(b^2)(ρy^2))
@@ -320,7 +323,7 @@ def multi_reg(df, target):
     cols = [c for c in df.columns if c != target]
     X_vector = np.hstack([np.ones((len(df), 1)), df[cols].to_numpy()])
     beta = np.linalg.pinv(X_vector) @ df[target].to_numpy()
-
+    print(beta)
 
 def hist(df):
     plt.figure(figsize=(20, 10))
@@ -402,3 +405,10 @@ if __name__ == "__main__":
     # plt.savefig("line.png")
     # df["is_post_june"] = (df.index >= "2023-06-01").astype(int)
     # mann_whitney_u(df, "Close", "is_post_june")
+    df = pd.DataFrame({
+        "x1":[1,2,3],
+        "x2":[2,1,0],
+        "y":[5,6,7]
+    })
+    
+    multi_reg(df,"y")
