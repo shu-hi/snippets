@@ -26,6 +26,7 @@ from scipy import stats
 import matplotlib.pyplot as plt
 import yfinance as yf
 import pandas as pd
+import pymc as pm
 # 正規分布(平均,分散)に従うX(μx,ρx^2),Y(μy,ρy^2),それぞれ独立について
 # X+Yは正規分布X+Y(μx+μy,ρx^2+ρy^2)に従う
 # 一般化すると線形結合aX+bYは正規分布aX+bY(aμx+bμy,(a^2)(ρx^2)+(b^2)(ρy^2))
@@ -118,7 +119,7 @@ def paired_t(df_1_column, df_2_column, both_side=False):
 # だが非等分散なので統合された(標本)標準誤差**1/2(=分散)を自由度で調整することでカイ二乗分布に近似
 # 正規分布/(カイ二乗分布/自由度)**1/2はt分布に従うので検定できる
 # なお非正規分布でも平均の差や分散は正規分布に収束するため使える
-def unpaired_t(df_1_column, df_2_column, both_side=False, name_1="", name_2=""):
+def unpaired_t(df_1_column, df_2_column, both_side=False, name_1="", name_2=""):#name_(1|2)は表示用のカラム名
     t_double = 2 if both_side else 1
     s2_1 = df_1_column.std(ddof=1) ** 2
     s2_2 = df_2_column.std(ddof=1) ** 2
@@ -316,14 +317,71 @@ def simple_reg(df, target):
 # 重回帰
 # 実測値をベクトルY、説明変数を行列x、各係数をベクトルwとし、モデルをy=wx(y:vector,w:vector,x:vector matrix)として
 # sigma(Y-y)**2の最小化を目指す。
-# (Y-y)^T*(Y-y)=(Y-xw)^T*(Y-xw)=(Y^T-(xw)^T)*(Y-xw)=Y^T*Y-2Y^T*xw+w^T*x^T*w*xと変形してwについて微分し、0になるのは
+# (Y-y)^T*(Y-y)=(Y-xw)^T*(Y-xw)=(Y^T-(xw)^T)*(Y-xw)=Y^T*Y-2(xw)^T*Y+w^T*x^T*w*xと変形してwについて微分し、0になるのは
 # w=(x^T*x)**-1*x^T*yのとき。
 # ただし(x^T*x)**-1が計算できないとき解が定まらない
+def multi_reg_exp(df, target):
+    cols = [c for c in df.columns if c != target]
+    Y=df[target].to_numpy()
+    X_vector = np.hstack([np.ones((len(df), 1)), df[cols].to_numpy()])
+    #           [1,x11,x12,x13,...]
+    # X_vector= [1,x21,x22,x23,...]
+    #           [1,x31,x31,x33,...]
+    xTurnedXReverse = np.linalg.inv(X_vector.T @X_vector)
+    xTurnedY=X_vector.T@ Y
+    w=xTurnedXReverse@xTurnedY
+    est=X_vector@w
+    mse=np.mean((Y-est)**2)
+    return w,est,mse
+# 重回帰
+# multi_reg_expと同じだが、multi_reg_expは逆行列が計算できないとエラーになる。
+# 疑似逆行列を使えば、そういう値にも強い。
+# (x^T*x)**-1*x^T≒np.linalg.pinv(X)
 def multi_reg(df, target):
     cols = [c for c in df.columns if c != target]
-    X_vector = np.hstack([np.ones((len(df), 1)), df[cols].to_numpy()])
-    beta = np.linalg.pinv(X_vector) @ df[target].to_numpy()
-    print(beta)
+    X = np.hstack([np.ones((len(df), 1)), df[cols].to_numpy()])
+    y = df[target].to_numpy()
+    w=(np.linalg.pinv(X) @ y)
+    est=X@w
+    mse=np.mean((y-est)**2)
+
+    plt.figure(figsize=(25, 15))
+    plt.plot(range(len(y)), y, label="actual",marker='o')
+    plt.plot(range(len(est)), est, label="predicted",marker='x')
+    plt.legend()
+    plt.savefig("multi_reg")
+    plt.close()
+
+    return w,est,mse
+
+def best(df_1_column, df_2_column):
+
+    with pm.Model() as model:
+
+        # priors
+        df1_mean = pm.Normal("df1_mean", 0, 10)
+        df2_mean = pm.Normal("df2_mean", 0, 10)
+
+        df1_std = pm.HalfNormal("df1_std", 10)
+        df2_std = pm.HalfNormal("df2_std", 10)
+
+        freeliness = pm.Exponential("freeliness", 1/30)
+
+        # likelihood（ここが超重要）
+        y1 = pm.StudentT("y1", mu=df1_mean, sigma=df1_std, nu=freeliness, observed=df_1_column)
+        y2 = pm.StudentT("y2", mu=df2_mean, sigma=df2_std, nu=freeliness, observed=df_2_column)
+
+        # differences
+        diff_of_means = pm.Deterministic("diff_of_means", df1_mean - df2_mean)
+        diff_of_stds = pm.Deterministic("diff_of_stds", df1_std - df2_std)
+
+        effect_size = pm.Deterministic(
+            "effect_size",
+            diff_of_means / np.sqrt((df1_std**2 + df2_std**2) / 2)
+        )
+
+        trace = pm.sample(2000, cores=2)
+
 
 def hist(df):
     plt.figure(figsize=(20, 10))
@@ -411,4 +469,7 @@ if __name__ == "__main__":
         "y":[5,6,7]
     })
     
-    multi_reg(df,"y")
+    w,est,mse=multi_reg(df,"y")
+    print(w)
+    print(est)
+    print(mse)

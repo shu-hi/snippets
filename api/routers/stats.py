@@ -15,7 +15,7 @@ class StatsRequest(BaseModel):
     query:str
 
 
-@router.post("/api/stats/req")
+@router.post("/api/stats/getData")
 async def store(request: StatsRequest):
     db=sC.UnifiedData()
     if request.csv_path:
