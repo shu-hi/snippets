@@ -1,6 +1,7 @@
 from fastapi import APIRouter, UploadFile
 import logging
 import classes.statsClass as sC
+import os
 from pydantic import BaseModel
 
 # Setup logging
@@ -17,10 +18,17 @@ class StatsRequest(BaseModel):
 
 @router.post("/api/stats/getData")
 async def store(request: StatsRequest):
-    db=sC.UnifiedData()
-    if request.csv_path:
-        db.load_csv(request.csv_path)
-    if request.gss_path:
-        db.load_sheet(request.gss_path)
-    db.attach_postgres()
-    return db.query(query)
+    try:
+        db=sC.UnifiedData()
+        if request.csv_path:
+            db.load_csv(request.csv_path)
+        if request.gss_path:
+            db.load_sheet(request.gss_path)
+        db.attach_postgres()
+        return {'status':'ok','data':db.query(request.query)}
+    except Exception as e:
+        return {'status':'ng','data':[],'error':repr(e)}
+
+@router.post("/api/stats/test")
+async def test():
+    return 'hello world'

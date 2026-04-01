@@ -358,22 +358,19 @@ def best(df_1_column, df_2_column):
 
     with pm.Model() as model:
 
-        # priors
-        df1_mean = pm.Normal("df1_mean", 0, 10)
+        # 事前分布
+        df1_mean = pm.Normal("df1_mean", 0, 10)#平均は平均0、標準偏差10くらいの信念
         df2_mean = pm.Normal("df2_mean", 0, 10)
-
-        df1_std = pm.HalfNormal("df1_std", 10)
+        df1_std = pm.HalfNormal("df1_std", 10)#標準偏差もは平均0、標準偏差10くらいの信念。非負なので|正規分布|
         df2_std = pm.HalfNormal("df2_std", 10)
 
         freeliness = pm.Exponential("freeliness", 1/30)
 
-        # likelihood（ここが超重要）
-        y1 = pm.StudentT("y1", mu=df1_mean, sigma=df1_std, nu=freeliness, observed=df_1_column)
-        y2 = pm.StudentT("y2", mu=df2_mean, sigma=df2_std, nu=freeliness, observed=df_2_column)
+        y1 = pm.StudentT("y1", mu=df1_mean, sigma=df1_std, nu=freeliness, observed=df_1_column)#df_1を事前分布としてt分布をサンプリング。どんなパラメータがどれくらい出るかは実測値による
+        y2 = pm.StudentT("y2", mu=df2_mean, sigma=df2_std, nu=freeliness, observed=df_2_column)#df_2を事前分布としてt分布をサンプリング。どんなパラメータがどれくらい出るかは実測値による
 
         # differences
         diff_of_means = pm.Deterministic("diff_of_means", df1_mean - df2_mean)
-        diff_of_stds = pm.Deterministic("diff_of_stds", df1_std - df2_std)
 
         effect_size = pm.Deterministic(
             "effect_size",
@@ -381,6 +378,15 @@ def best(df_1_column, df_2_column):
         )
 
         trace = pm.sample(2000, cores=2)
+
+    # 事後分布から統計量を抽出
+    diff_of_means_samples = trace.posterior["diff_of_means"].values.flatten()
+    effect_size_samples = trace.posterior["effect_size"].values.flatten()
+
+    effect_size_mean = effect_size_samples.mean()
+    prob_diff_positive = (diff_of_means_samples > 0).mean()
+
+    return trace, effect_size_mean, prob_diff_positive
 
 
 def hist(df):
@@ -454,6 +460,13 @@ if __name__ == "__main__":
     df = get_stock_history("^N225", "2023-01-01", "2024-01-01")
     df_all = get_stock_history("^N225", "2024-01-01", "2025-01-01")
     simple_reg(df.loc[:, ["Close", "Open"]], "Close")
+
+    # Bayesian t-test demo
+    print("\n=== Bayesian t-test (best function) ===")
+    trace, effect_size_mean, prob_diff_positive = best(df["Close"], df_all["Close"])
+    print(f"Effect size (mean): {effect_size_mean:.4f}")
+    print(f"Probability that 2023-2024 mean > 2024-2025 mean: {prob_diff_positive:.4f}")
+
     # expected_mean = df_all["Close"].mean()
     # standard_error, ci_low, ci_high, p_value = unpaired_t(
     #    df["Close"], df_all["Close"], False, "under_covid", "post_covid"
@@ -463,13 +476,13 @@ if __name__ == "__main__":
     # plt.savefig("line.png")
     # df["is_post_june"] = (df.index >= "2023-06-01").astype(int)
     # mann_whitney_u(df, "Close", "is_post_june")
-    df = pd.DataFrame({
-        "x1":[1,2,3],
-        "x2":[2,1,0],
-        "y":[5,6,7]
-    })
+    # df = pd.DataFrame({
+    #     "x1":[1,2,3],
+    #     "x2":[2,1,0],
+    #     "y":[5,6,7]
+    # })
     
-    w,est,mse=multi_reg(df,"y")
-    print(w)
-    print(est)
-    print(mse)
+    # w,est,mse=multi_reg(df,"y")
+    # print(w)
+    # print(est)
+    # print(mse)
