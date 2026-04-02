@@ -1,84 +1,44 @@
 from abc import ABC, abstractmethod
 import pandas as pd
-import duckdb
-import func
-import re
-import os
-import json
-envs = func.get_envs()
-class UnifiedData:
+import matplotlib as plt
+import io
+cache = {}
+class BasicEDA:
 
-    def __init__(self):
-        self.con = duckdb.connect()
-        # postgres extension
-        self.con.execute("INSTALL postgres")
-        self.con.execute("LOAD postgres")
-        self.con.execute("SET force_download=true")
-    def _safe_table(self, name):
-
-        if not re.match(r"^[a-zA-Z0-9_]+$", name):
-            raise ValueError("invalid table name")
-        return name
-
-    # ------------------------
-    # postgres
-    # ------------------------
-    def attach_postgres(self):
-        db_user = os.getenv("DB_USER")
-        db_pass = os.getenv("DB_PASSWORD")
-        db_host = os.getenv("DB_HOST")
-        db_port = os.getenv("DB_PORT")
-        db_name = os.getenv("DB_NAME")
-        self.con.execute(f"""
-            ATTACH 'dbname={db_name} user={db_user} password={db_pass} host={db_host} port={db_port}' 
-            AS pg (TYPE postgres)
-            """)
-
-    # ------------------------
-    # CSV
-    # ------------------------
-    def load_csv(self, path):
-        table = self._safe_table('csv')
-        self.con.execute(f"""
-        CREATE OR REPLACE TABLE {table} AS
-        SELECT * FROM read_csv_auto('{path}')
-        """)
-    # ------------------------
-    # Google Sheets (CSV export)
-    # ------------------------
-    def load_sheet(self, path):
-        spl=path.split('/')
-        ext=sorted(spl,key=lambda word: len(word))[-1]if spl else None
-        table = self._safe_table('gss')
-        self.con.execute(f"""
-        CREATE OR REPLACE TABLE {table} AS
-        SELECT * FROM read_csv_auto('https://docs.google.com/spreadsheets/export?format=csv&id={ext}')
-        """)
-
-    # ------------------------
-    # realtime sheet view
-    # ------------------------
-
-    def view_sheet(self, path):
-        table = self._safe_table('gssv')
-        self.con.execute(f"""
-        CREATE OR REPLACE VIEW {table} AS
-        SELECT * FROM read_csv_auto('{path}')
-        """)
-
-    # ------------------------
-    # pandas table
-    # ------------------------
-
-    def register_df(self, df):
-        table = self._safe_table('df')
-        self.con.register(table, df)
-
-    # ------------------------
-    # query
-    # ------------------------
-    def query(self, sql):
-        df = self.con.execute(sql).fetchdf()
-        json_str = df.to_json(orient="records", date_format="iso")
-        data = json.loads(json_str)
-        return data
+    def __init__(self,df):
+        self.df=df.copy()
+    def _hist(self):
+        plt.figure(figsize=(20, 10))
+        n_cols = len(self.df.columns)
+        n_rows = (n_cols + 3) // 4  # 1行に4つ並べる
+        fig, axes = plt.subplots(n_rows, 3, figsize=(20, 5 * n_rows))
+        axes = axes.flatten()
+        for i, col in enumerate(self.df.columns):
+            ax = axes[i]
+            if self.df[col].dtype == "object":
+                counts = self.df[col].value_counts()
+                counts.plot(kind="bar", ax=ax, alpha=0.7)
+                ax.set_title(f"Value counts of {col}")
+            else:
+                # if df[col].nunique() > 2 and np.issubdtype(df[col].dtype, np.number):
+                #    df = func.shrink_outlier(df, col)
+                an, bins, patches = ax.hist(df[col].dropna(), bins=20, alpha=0.7)
+                # ビンの境界をx軸上にテキストで表示
+                for boundary in bins:
+                    ax.text(
+                        boundary,
+                        -500,
+                        f"{boundary:.1f}",
+                        rotation=90,
+                        va="bottom",
+                        ha="center",
+                        fontsize=8,
+                        color="gray",
+                    )
+                ax.set_title(f"{col}")
+        # plt.tight_layout()
+        plt.legend()
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close()
+        buffer.seek(0)
