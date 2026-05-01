@@ -9,7 +9,7 @@ import time
 cache = {}
 class UnifiedData:
 
-    def __init__(self):
+    def connect(self):
         self.con = duckdb.connect()
         # postgres extension
         self.con.execute("INSTALL postgres")
@@ -86,6 +86,5 @@ class UnifiedData:
             cache[key]=df.copy()
             if len(cache)>10:
                 cache.pop(next(iter(cache)))
-        json_str = df.to_json(orient="records", date_format="iso")
-        data = json.loads(json_str)
-        return data
+        
+        return df

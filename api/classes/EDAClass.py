@@ -2,12 +2,15 @@ from abc import ABC, abstractmethod
 import pandas as pd
 import matplotlib as plt
 import io
+import base64
+import numpy as np
+from scipy import stats
 cache = {}
 class BasicEDA:
 
     def __init__(self,df):
         self.df=df.copy()
-    def _hist(self):
+    def hist(self):
         plt.figure(figsize=(20, 10))
         n_cols = len(self.df.columns)
         n_rows = (n_cols + 3) // 4  # 1行に4つ並べる
@@ -22,7 +25,7 @@ class BasicEDA:
             else:
                 # if df[col].nunique() > 2 and np.issubdtype(df[col].dtype, np.number):
                 #    df = func.shrink_outlier(df, col)
-                an, bins, patches = ax.hist(df[col].dropna(), bins=20, alpha=0.7)
+                an, bins, patches = ax.hist(self.df[col].dropna(), bins=20, alpha=0.7)
                 # ビンの境界をx軸上にテキストで表示
                 for boundary in bins:
                     ax.text(
@@ -42,3 +45,6 @@ class BasicEDA:
         plt.savefig(buffer, format="png")
         plt.close()
         buffer.seek(0)
+        img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+        return img_base64
+
