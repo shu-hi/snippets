@@ -21,6 +21,8 @@
 # TODO　ポアソン回帰
 # TODO　uplift modeling
 #TODO 決定境界の可視化
+#TODO 離散選択モデル
+#TODO　marketing model mix
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
